@@ -1,0 +1,115 @@
+body {
+  display: grid;
+  grid-template-rows: min-content min-content min-content 1fr min-content;
+  margin: auto;
+  max-width: 800px;
+}
+#search-container {
+  padding: 10px;
+
+  #search {
+    width: 100%;
+    padding: var(--gap);
+  }
+}
+#entries-container {
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.entries {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px 1fr min-content min-content 0;
+
+  @media (width < 500px) {
+    grid-template-columns: 48px 2fr 1fr 0 0;
+  }
+
+  #tbody {
+    display: contents;
+  }
+  #sort-by-name,
+  #sort-by-issuer {
+    cursor: ns-resize;
+    user-select: none;
+  }
+  #sort-by-name,
+  #sort-by-groups {
+    max-width: 15vw;
+  }
+
+  span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  label {
+    display: grid;
+    grid-column: 1 / 6;
+    grid-template-columns: subgrid;
+    line-height: 32px;
+    border-bottom: 1px solid var(--bd);
+
+    &:has(input:checked) {
+      background: var(--bg-alt);
+    }
+  }
+  label.header {
+    text-align: left;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    background: white; /* important so content doesn't show through */
+    z-index: 2;
+  }
+  input[type=radio] {
+    outline: none;
+  }
+  img[name=icon] {
+     place-self: center;
+  }
+}
+.entry.nomatch {
+  display: none;
+}
+
+footer {
+  padding: var(--gap);
+  background-color: var(--bg-alt);
+
+  div {
+    display: grid;
+    grid-template-columns: 1fr min-content;
+    align-items: center;
+  }
+  #code {
+    font-weight: bold;
+    text-align: center;
+  }
+}
+
+.progress {
+  --initial: -10s;
+  --period: 30s;
+
+  width: 100%;
+  height: 4px;
+  background: #0002;
+  overflow: hidden;
+}
+.progress::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: red;
+  transform-origin: left;
+  animation: progress var(--period) linear;
+  animation-delay: var(--initial);
+}
+
+@keyframes progress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+

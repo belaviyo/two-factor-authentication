@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" type="text/css" href="../style.css">
+  <link rel="stylesheet" type="text/css" href="index.css">
+</head>
+<body>
+  <h1>2FA (Two-Factor Authentication)</h1>
+  <form id="content" action="../search/index.html" method="POST">
+    <span>Enter</span>
+    <input type="password" id="password" placeholder="Password" minlength="4" required autofocus title="min password length is 4 chars">
+    <span>to</span>
+    <input type="submit" id="openDB" value="Open a Database" disabled>
+    <input type="button" id="createDB" value="Create a new Database" disabled>
+    <span>or use</span>
+    <select id="stored" disabled>
+      <option>Select Handle</option>
+    </select>
+  </form>
+  <footer>
+    <input type="button" id="reset" value="Clear Stored Handles">
+  </footer>
+  <notification-view id="toast"></notification-view>
+
+  <script src="../aegis/scrypt.umd.min.js"></script>
+  <script src="../notify/notification-view.js"></script>
+  <script src="storage.js"></script>
+  <script type="module" src="index.mjs"></script>
+</body>
+</html>
+

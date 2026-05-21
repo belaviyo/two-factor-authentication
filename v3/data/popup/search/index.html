@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" type="text/css" href="../style.css">
+  <link rel="stylesheet" type="text/css" href="index.css">
+</head>
+<body>
+  <div id="progress"></div>
+  <h1>2FA (Two-Factor Authentication)</h1>
+  <div id="search-container" title="Press Ctrl + F (or Command + F on Mac) to search. Use the arrow keys to navigate through the items.">
+    <input type="search" id="search" autofocus placeholder="Search">
+  </div>
+  <div id="entries-container">
+    <template id="entry">
+      <label class="entry">
+        <img name="icon" width="24">
+        <span name="name"></span>
+        <span name="issuer"></span>
+        <span name="groups"></span>
+        <input type="radio" name="entry">
+      </label>
+    </template>
+    <div class="entries">
+      <label class="header">
+        <span></span>
+        <span id="sort-by-name">Name</span>
+        <span id="sort-by-issuer">Issuer</span>
+        <span id="sort-by-groups">Groups</span>
+        <span></span>
+      </label>
+      <fieldset id="tbody"></fieldset>
+    </div>
+  </div>
+  <footer>
+    <div>
+      <span id="code">Select an item to show OTP</span>
+      <input type="button" id="copy" value="Copy" disabled>
+    </div>
+  </footer>
+  <script src="otplib.js"></script>
+  <script type="module" src="index.mjs"></script>
+</body>
+</html>

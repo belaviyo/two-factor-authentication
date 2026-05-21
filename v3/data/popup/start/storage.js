@@ -1,0 +1,93 @@
+class Storage {
+  #DB_NAME = 'file-storage';
+  #db;
+
+  constructor(name = 'file') {
+    this.#DB_NAME = name;
+  }
+  open(storages = []) { // [{name: 'handles', options: {autoIncrement: true}}]
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.#DB_NAME, 1);
+
+      request.onupgradeneeded = () => {
+        const db = request.result;
+
+        for (const storage of storages) {
+          if (db.objectStoreNames.contains(storage.name) === false) {
+            db.createObjectStore(storage.name, storage.options || {
+              autoIncrement: true
+            });
+          }
+        }
+      };
+
+      request.onsuccess = () => {
+        this.#db = request.result;
+        resolve();
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+  close() {
+    this.#db.close();
+  }
+  put(storage, value) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.#db.transaction(storage, 'readwrite');
+
+      // Store the file with its data
+      const fileStore = transaction.objectStore(storage);
+      const request = fileStore.add(value);
+
+      request.onsuccess = () => resolve();
+
+      request.onerror = e => reject(Error(e.target.error));
+      transaction.onerror = e => reject(Error(e.target.error));
+    });
+  }
+  read(storage, keypath) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.#db.transaction(storage, 'readonly');
+      const store = transaction.objectStore(storage);
+
+      const request = store.get(keypath);
+      request.onsuccess = () => resolve({
+        keypath,
+        value: request.result
+      });
+      request.onerror = e => reject(Error('getHandle, ' + e.target.error));
+    });
+  }
+  remove(storage, keypath) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.#db.transaction(storage, 'readwrite');
+      const store = transaction.objectStore(storage);
+
+      const request = store.delete(keypath);
+
+      request.onsuccess = () => resolve();
+      request.onerror = e => reject(Error(e.target.error));
+      transaction.onerror = e => reject(Error(e.target.error));
+    });
+  }
+  list(storage) {
+    return new Promise((resolve, reject) => {
+      const transaction = this.#db.transaction(storage, 'readonly');
+
+      const values = [];
+      transaction.objectStore(storage).openCursor().onsuccess = e => {
+        const cursor = e.target.result;
+        if (cursor) {
+          values.push({
+            keypath: cursor.key,
+            value: cursor.value
+          });
+          cursor.continue();
+        }
+      };
+      transaction.onerror = e => reject(Error(e.target.error));
+      transaction.oncomplete = () => resolve(values);
+    });
+  }
+}
+

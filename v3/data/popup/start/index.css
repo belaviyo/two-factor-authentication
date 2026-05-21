@@ -1,0 +1,43 @@
+body {
+  display: grid;
+  grid-template-rows: min-content 1fr min-content;
+}
+#content {
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: center;
+  gap: var(--gap);
+
+  #create-container {
+    display: flex;
+    gap: var(--gap);
+  }
+
+  select,
+  input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  input[type=password] {
+    text-align: center;
+  }
+  input[type=password]:invalid {
+    border: 2px solid red;
+    outline: none;
+  }
+  input[type=password]:valid {
+    border: 2px solid green;
+  }
+  select:empty {
+    display: none;
+  }
+  span {
+    align-self: center;
+  }
+}
+
+footer {
+  text-align: end;
+}
