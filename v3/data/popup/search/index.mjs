@@ -1,8 +1,10 @@
 /* global otplib */
+
 import {AegisVault} from '../aegis/core.mjs';
 import Fuse from './fuse.min.mjs';
 
 const groups = new Map();
+const icons = new Map();
 const map = new Map();
 
 const current = {};
@@ -30,6 +32,7 @@ const start = entries => {
   // clean
   self.tbody.textContent = '';
   map.clear();
+  icons.clear();
 
   for (let n = 0; n < entries.length; n += 1) {
     const entry = entries[n];
@@ -43,6 +46,12 @@ const start = entries => {
 
     if (entry.icon) {
       clone.querySelector('[name=icon]').src = `data:${entry['icon_mime']};base64,` + entry.icon;
+      if (icons.has(entry['icon_hash']) === false) {
+        icons.set(entry['icon_hash'], {
+          'icon': entry.icon,
+          'icon_mime': entry['icon_mime']
+        });
+      }
     }
 
     const g = clone.querySelector('[name=groups]');
@@ -117,38 +126,16 @@ onmessage = e => {
 
   sorting.perform(database.entries);
   start(database.entries);
-  document.getElementById('sort-by-name').onclick = () => {
-    if (sorting.name === 'name') {
-      sorting.direction = -1 * sorting.direction;
-    }
-    else {
-      sorting.direction = 1;
-      sorting.name = 'name';
-    }
-    sorting.perform(database.entries);
-  };
-  document.getElementById('sort-by-issuer').onclick = () => {
-    if (sorting.name === 'issuer') {
-      sorting.direction = -1 * sorting.direction;
-    }
-    else {
-      sorting.direction = 1;
-      sorting.name = 'issuer';
-    }
-    sorting.perform(database.entries);
-  };
 
-  document.addEventListener('save', async () => {
-    const target = document.querySelector('#editor input[type=submit]');
-
+  self.save.onclick = async e => {
     try {
       const prefs = await chrome.storage.local.get({
         'backup-before-save': true
       });
 
-      target.disabled = true;
+      e.target.disabled = true;
 
-      target.value = 'Open handle...';
+      e.target.value = 'Open handle...';
       const storage = new Storage('file');
       await storage.open([{
         name: 'handles'
@@ -157,7 +144,7 @@ onmessage = e => {
       const handle = o.value;
 
 
-      target.value = 'Ask permission...';
+      e.target.value = 'Ask permission...';
       const p = await handle.queryPermission({mode: 'readwrite'});
       if (p !== 'granted') {
         const p = await handle.requestPermission({mode: 'readwrite'});
@@ -166,7 +153,7 @@ onmessage = e => {
         }
       }
 
-      target.value = 'Read file...';
+      e.target.value = 'Read file...';
       const file = await handle.getFile();
       const json1 = await new Response(file).json();
 
@@ -185,7 +172,7 @@ onmessage = e => {
 
 
       // is password valid?
-      target.value = 'Decrypt...';
+      e.target.value = 'Decrypt...';
       const vault = new AegisVault(json1);
       await vault.decrypt(password);
 
@@ -194,30 +181,17 @@ onmessage = e => {
       for (const [uuid, name] of groups.entries()) {
         database.groups.push({uuid, name});
       }
-      // delete deprecated groups
-      for (const entry of database.entries) {
-        entry.groups = entry.groups.filter(uuid => groups.has(uuid));
-      }
 
-      target.value = 'Encrypt...';
+      e.target.value = 'Encrypt...';
       const json2 = await vault.encrypt(password, database);
 
-      target.value = 'Saving DB...';
+      e.target.value = 'Saving DB...';
       const writable = await handle.createWritable();
       await writable.write(JSON.stringify(json2, null, 2));
       await writable.close();
 
-      target.value = 'Save';
-
-      // edit entry
-      const label = document.querySelector('label:has(input:checked)');
-      label.querySelector('span[name=name]').textContent = current.entry.name;
-      label.querySelector('span[name=issuer]').textContent = current.entry.issuer;
-      label.querySelector('span[name=groups]').textContent = current.entry.groups.join(', ');
-
-      self.editor.close();
-
-      sorting.perform(database.entries);
+      e.target.value = 'Save';
+      onbeforeunload = undefined;
     }
     catch (e) {
       console.error(e);
@@ -228,8 +202,10 @@ onmessage = e => {
       });
     }
 
-    target.disabled = false;
-  });
+    e.target.disabled = false;
+  };
+
+  // document.addEventListener('sort', () => sorting.perform(database.entries));
 };
 
 // keyboard support
@@ -242,7 +218,7 @@ onkeydown = e => {
 
     return;
   }
-  if ((e.key.toLowerCase() === 'c' && meta) || e.key === 'Enter') {
+  if (e.key.toLowerCase() === 'c' && meta) {
     e.preventDefault();
     self.copy.click();
 
@@ -270,8 +246,6 @@ self.tbody.ondblclick = () => self.copy.click();
 const generate = entry => {
   if (current.entry !== entry) {
     current.entry = entry;
-
-    console.log(entry);
 
     const now = (Date.now() / 1000);
     const timeIntoPeriod = now % entry.info.period;
@@ -363,13 +337,11 @@ self.progress.addEventListener('animationend', () => {
 
 // edit
 const commands = {
-  'remove-icon': false,
   'remove-groups': []
 };
 self.edit.onclick = () => {
   // reset
   commands['remove-groups'].length = 0;
-  commands['remove-icon'] = false;
 
   self.editor.querySelector('input[name=name]').value = current.entry.name;
   self.editor.querySelector('input[name=issuer]').value = current.entry.issuer;
@@ -382,30 +354,76 @@ self.edit.onclick = () => {
     self.editor.querySelector('select[name=groups]').append(option);
   }
   self.editor.querySelector('select[name=groups]').dispatchEvent(new Event('change'));
+
+  const hash = current.entry['icon_hash'];
+  self.editor.querySelector('fieldset[name=icons]').textContent = '';
+  for (const [uuid, o] of icons.entries()) {
+    const clone = document.importNode(self.img.content, true);
+    clone.querySelector('img').src = `data:${o['icon_mime']};base64,` + o.icon;
+    const input = clone.querySelector('input[type=radio]');
+    input.value = uuid;
+    if (hash && hash === uuid) {
+      input.checked = true;
+    }
+    self.editor.querySelector('fieldset[name=icons]').append(clone.firstElementChild);
+  }
+
   self.editor.querySelector('input[name=remove-icon]').onclick = () => {
-    commands['remove-icon'] = true;
+    const icon = self.editor.querySelector('.icons input:checked');
+    if (icon) {
+      icon.checked = false;
+    }
   };
   self.editor.querySelector('form').onsubmit = e => {
     e.preventDefault();
 
-    current.entry.name = self.editor.querySelector('input[name=name]').value;
-    current.entry.issuer = self.editor.querySelector('input[name=issuer]').value;
+    const label = self.tbody.querySelector('label:has(input:checked)');
+
+    current.entry.name = label.querySelector('span[name=name]').textContent =
+      self.editor.querySelector('input[name=name]').value;
+    current.entry.issuer = label.querySelector('span[name=issuer]').textContent =
+      self.editor.querySelector('input[name=issuer]').value;
     current.entry.groups = [...self.editor.querySelector('select[name=groups]').selectedOptions].map(o => o.value);
-    if (commands['remove-icon']) {
+    label.querySelector('span[name=groups]').textContent =
+      current.entry.groups.map(uuid => groups.get(uuid)).join(', ');
+
+    const icon = self.editor.querySelector('fieldset[name=icons] input[type=radio]:checked');
+    if (icon) {
+      current.entry['icon_hash'] = icon.value;
+      const o = icons.get(icon.value);
+      Object.assign(current.entry, o);
+      label.querySelector('img[name=icon]').src = `data:${o['icon_mime']};base64,` + o.icon;
+    }
+    else {
       current.entry.icon = null;
       delete current.entry['icon_hash'];
       delete current.entry['icon_mime'];
+      label.querySelector('img[name=icon]').src = '';
     }
-    else if (commands.icon) {
-      current.entry.icon = commands.icon;
-      current.entry['icon_hash'] = commands['icon_hash'];
-      current.entry['icon_mime'] = commands['icon_mime'];
-    }
+    // Fix groups
     for (const uuid of commands['remove-groups']) {
       groups.delete(uuid);
     }
 
-    document.dispatchEvent(new Event('save'));
+    if (commands['remove-groups'].length) {
+      for (const label of map.values()) {
+        const {entry} = label.querySelector('input[type=radio]');
+        if (entry.groups.some(uuid => groups.has(uuid) === false)) {
+          entry.groups = entry.groups.filter(uuid => groups.has(uuid));
+          label.querySelector('[name=groups]').textContent = entry.groups.join(', ');
+        }
+      }
+    }
+
+    self.editor.close();
+
+    document.dispatchEvent(new Event('sort'));
+    self.save.disabled = false;
+    onbeforeunload = e => {
+      e.preventDefault();
+      // required for Chrome
+      return (e.returnValue = '');
+    };
   };
 
   self.editor.showModal();
@@ -456,28 +474,65 @@ self.editor.querySelector('input[name=add-a-group]').onclick = () => {
   }
 };
 self.editor.querySelector('input[name=delete-groups]').onclick = e => {
-  for (const option of self.editor.querySelector('select[name=groups]').selectedOptions) {
-    const uuid = option.value;
-    commands['remove-groups'].push(uuid);
-    option.remove();
+  if (confirm('Selected groups will be deleted from all items. Are you sure?')) {
+    for (const option of self.editor.querySelector('select[name=groups]').selectedOptions) {
+      const uuid = option.value;
+      commands['remove-groups'].push(uuid);
+      option.remove();
+    }
+    self.editor.querySelector('select[name=groups]').dispatchEvent(new Event('change'));
   }
-  self.editor.querySelector('select[name=groups]').dispatchEvent(new Event('change'));
 };
-self.editor.querySelector('input[name=icon]').onchange = async e => {
+self.editor.querySelector('input[name=new-icon]').onchange = async e => {
   try {
     const file = e.target.files[0];
     const blob = await new Response(file).blob();
     const buffer = await blob.arrayBuffer();
     const bytes = new Uint8Array(buffer);
     const base64 = btoa(String.fromCharCode(...bytes));
-    commands['remove-icon'] = false;
-    commands.icon = base64;
-    const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
-    commands['icon_hash'] = [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('');
-    commands['icon_mime'] = blob.type;
+    const hash = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+
+    if (icons.has(hash)) {
+      self.editor.querySelector(`input[type=radio][value="${hash}"]`).click();
+    }
+    else {
+      icons.set(hash, {
+        'icon': base64,
+        'icon_mime': blob.type
+      });
+
+      const clone = document.importNode(self.img.content, true);
+      clone.querySelector('img').src = `data:${blob.mime};base64,` + base64;
+      const radio = clone.querySelector('input[type=radio]');
+      radio.value = hash;
+      self.editor.querySelector('fieldset[name=icons]').append(clone.firstElementChild);
+      radio.click();
+    }
     e.value = '';
   }
   catch (e) {
     alert('Icon is too large?\n\n' + e.message);
   }
+};
+
+document.getElementById('sort-by-name').onclick = () => {
+  if (sorting.name === 'name') {
+    sorting.direction = -1 * sorting.direction;
+  }
+  else {
+    sorting.direction = 1;
+    sorting.name = 'name';
+  }
+  document.dispatchEvent(new Event('sort'));
+};
+
+document.getElementById('sort-by-issuer').onclick = () => {
+  if (sorting.name === 'issuer') {
+    sorting.direction = -1 * sorting.direction;
+  }
+  else {
+    sorting.direction = 1;
+    sorting.name = 'issuer';
+  }
+  document.dispatchEvent(new Event('sort'));
 };

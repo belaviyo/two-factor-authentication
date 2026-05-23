@@ -134,6 +134,7 @@ footer {
       display: flex;
       gap: var(--gap);
       justify-self: end;
+      align-items: center;
     }
   }
   input[type=file] {
@@ -142,6 +143,24 @@ footer {
   input[name=close] {
     align-self: start;
     justify-self: end;
+  }
+  fieldset[name=icons] {
+    padding: var(--gap);
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-gap: var(--gap);
+    max-height: 3lh;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    label {
+      border: solid 1px transparent;
+      display: grid;
+      grid-template-columns: 1fr 0;
+    }
+    label:has(input:checked) {
+      border-color: red;
+    }
   }
 }
 

@@ -36,6 +36,7 @@
   <footer>
     <span id="code">Select an item to show OTP</span>
     <div>
+      <button id="save" disabled accesskey="s"><u>S</u>ave</button>
       <button id="edit" disabled accesskey="e"><u>E</u>dit</button>
       <button id="copy" disabled accesskey="c"><u>C</u>opy</button>
       <button id="new" disabled accesskey="n"><u>N</u>ew</button>
@@ -49,8 +50,15 @@
       <input type="text" name="issuer">
       <span>Icon</span>
       <div>
+        <template id="img">
+          <label class="icon">
+            <img width="16">
+            <input type="radio" name="icon">
+          </label>
+        </template>
+        <fieldset name="icons"></fieldset>
         <label class="button">
-          <input type="file" name="icon" accept="image/*">
+          <input type="file" name="new-icon" accept="image/*">
           <span>Choose File</span>
         </label>
         <input type="button" name="remove-icon" value="Remove">
@@ -64,8 +72,8 @@
       </div>
       <span></span>
       <div>
-        <input type="submit" name="save" value="Save">
-        <input type="button" name="close" value="Close">
+        <input type="button" name="close" value="Cancel">
+        <input type="submit" value="Done">
       </div>
     </form>
   </dialog>
