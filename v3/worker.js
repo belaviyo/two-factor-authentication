@@ -6,7 +6,8 @@ const once = async () => {
 
   const prefs = await chrome.storage.local.get({
     'password-on-session': false,
-    'handle-on-indexdb': true
+    'handle-on-indexdb': true,
+    'backup-before-save': true
   });
 
   chrome.contextMenus.create({
@@ -22,6 +23,13 @@ const once = async () => {
     title: 'Store Database Handles',
     id: 'handle-on-indexdb',
     checked: prefs['handle-on-indexdb']
+  });
+  chrome.contextMenus.create({
+    contexts: ['action'],
+    type: 'checkbox',
+    title: 'Backup Database before Overwriting',
+    id: 'backup-before-save',
+    checked: prefs['backup-before-save']
   });
 };
 chrome.runtime.onStartup.addListener(once);

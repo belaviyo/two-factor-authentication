@@ -1,9 +1,14 @@
 import {AegisVault} from '../aegis/core.mjs';
 
-const open = database => {
-  parent.navigateTo('search/index.html', {
-    database,
-    password: self.password.value
+const open = (database, keypath) => {
+  parent.command({
+    cmd: 'navigate',
+    href: 'search/index.html',
+    data: {
+      password: self.password.value,
+      keypath,
+      database
+    }
   });
 };
 
@@ -17,7 +22,7 @@ const save = async handle => {
       return;
     }
   }
-  await storage.put('handles', handle);
+  return await storage.put('handles', handle);
 };
 
 self.openDB.onclick = async e => {
@@ -58,16 +63,21 @@ self.openDB.onclick = async e => {
     }
 
     // store handle
+    let keypath;
     if (prefs['handle-on-indexdb']) {
       e.target.value = 'Storing Handle...';
-      await save(handle);
+      keypath = await save(handle);
     }
 
-    open(db);
+    open(db, keypath);
   }
   catch (e) {
     console.error(e);
-    self.toast.notify(e.message || 'Wrong password. Try again...', 'error');
+    parent.command({
+      cmd: 'notify',
+      type: 'error',
+      message: e.message || 'Wrong password. Try again...'
+    });
     self.password.focus();
   }
   e.target.disabled = false;
@@ -118,8 +128,9 @@ self.createDB.onclick = async e => {
       name: 'handles'
     }]);
 
+    let keypath;
     if (prefs['handle-on-indexdb']) {
-      await save(handle);
+      keypath = await save(handle);
     }
 
     const db = await vault.decrypt(cp);
@@ -131,7 +142,7 @@ self.createDB.onclick = async e => {
       });
     }
 
-    open(db);
+    open(db, keypath);
   }
   catch (e) {
     console.error(e);
@@ -190,7 +201,7 @@ self.stored.onchange = async e => {
         });
       }
 
-      open(db);
+      open(db, keypath);
     }
     catch (e) {
       console.error(e);

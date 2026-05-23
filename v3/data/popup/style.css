@@ -18,7 +18,8 @@ body {
   margin: 0;
   height: 100vh;
 }
-select,
+.button,
+select:not([multiple]),
 button,
 input[type=submit],
 input[type=button] {
@@ -29,12 +30,14 @@ input[type=button] {
   padding: 5px 10px;
   cursor: pointer;
 }
+.button,
 select,
 button,
 textarea,
 input {
   border: solid 1px rgba(0, 0, 0, 0.25);
 }
+button:disabled,
 input[type=submit]:disabled,
 input[type=button]:disabled {
   opacity: 0.5;

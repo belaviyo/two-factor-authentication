@@ -34,11 +34,44 @@
     </div>
   </div>
   <footer>
+    <span id="code">Select an item to show OTP</span>
     <div>
-      <span id="code">Select an item to show OTP</span>
-      <input type="button" id="copy" value="Copy" disabled>
+      <button id="edit" disabled accesskey="e"><u>E</u>dit</button>
+      <button id="copy" disabled accesskey="c"><u>C</u>opy</button>
+      <button id="new" disabled accesskey="n"><u>N</u>ew</button>
     </div>
   </footer>
+  <dialog id="editor" popover>
+    <form>
+      <span>Name</span>
+      <input type="text" name="name">
+      <span>Issuer</span>
+      <input type="text" name="issuer">
+      <span>Icon</span>
+      <div>
+        <label class="button">
+          <input type="file" name="icon" accept="image/*">
+          <span>Choose File</span>
+        </label>
+        <input type="button" name="remove-icon" value="Remove">
+      </div>
+      <label>Groups <input type="checkbox" name="has-groups"></label>
+      <select name="groups" multiple></select>
+      <span></span>
+      <div>
+        <input type="button" name="delete-groups" value="Delete selected Groups">
+        <input type="button" name="add-a-group" value="Add a new Group">
+      </div>
+      <span></span>
+      <div>
+        <input type="submit" name="save" value="Save">
+        <input type="button" name="close" value="Close">
+      </div>
+    </form>
+  </dialog>
+
+  <script src="../storage/core.js"></script>
+  <script src="../aegis/scrypt.umd.min.js"></script>
   <script src="otplib.js"></script>
   <script type="module" src="index.mjs"></script>
 </body>

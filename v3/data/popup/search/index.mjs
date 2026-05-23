@@ -1,8 +1,11 @@
 /* global otplib */
+import {AegisVault} from '../aegis/core.mjs';
 import Fuse from './fuse.min.mjs';
 
 const groups = new Map();
 const map = new Map();
+
+const current = {};
 
 const sorting = {
   name: 'name',
@@ -105,7 +108,8 @@ const start = entries => {
 };
 
 onmessage = e => {
-  const {database} = e.data;
+  const {database, keypath, password} = e.data;
+
 
   for (const group of database.groups) {
     groups.set(group.uuid, group.name);
@@ -133,21 +137,120 @@ onmessage = e => {
     }
     sorting.perform(database.entries);
   };
+
+  document.addEventListener('save', async () => {
+    const target = document.querySelector('#editor input[type=submit]');
+
+    try {
+      const prefs = await chrome.storage.local.get({
+        'backup-before-save': true
+      });
+
+      target.disabled = true;
+
+      target.value = 'Open handle...';
+      const storage = new Storage('file');
+      await storage.open([{
+        name: 'handles'
+      }]);
+      const o = await storage.read('handles', keypath);
+      const handle = o.value;
+
+
+      target.value = 'Ask permission...';
+      const p = await handle.queryPermission({mode: 'readwrite'});
+      if (p !== 'granted') {
+        const p = await handle.requestPermission({mode: 'readwrite'});
+        if (p !== 'granted') {
+          throw Error('Permission is: ' + p);
+        }
+      }
+
+      target.value = 'Read file...';
+      const file = await handle.getFile();
+      const json1 = await new Response(file).json();
+
+      // backup
+      if (prefs['backup-before-save']) {
+        const blob = new Blob([json1], {type: 'application/json'});
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = handle.name.replace('.json', '-' + Date.now() + '.json');
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }
+
+
+      // is password valid?
+      target.value = 'Decrypt...';
+      const vault = new AegisVault(json1);
+      await vault.decrypt(password);
+
+      // build groups
+      database.groups = [];
+      for (const [uuid, name] of groups.entries()) {
+        database.groups.push({uuid, name});
+      }
+      // delete deprecated groups
+      for (const entry of database.entries) {
+        entry.groups = entry.groups.filter(uuid => groups.has(uuid));
+      }
+
+      target.value = 'Encrypt...';
+      const json2 = await vault.encrypt(password, database);
+
+      target.value = 'Saving DB...';
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(json2, null, 2));
+      await writable.close();
+
+      target.value = 'Save';
+
+      // edit entry
+      const label = document.querySelector('label:has(input:checked)');
+      label.querySelector('span[name=name]').textContent = current.entry.name;
+      label.querySelector('span[name=issuer]').textContent = current.entry.issuer;
+      label.querySelector('span[name=groups]').textContent = current.entry.groups.join(', ');
+
+      self.editor.close();
+
+      sorting.perform(database.entries);
+    }
+    catch (e) {
+      console.error(e);
+      parent.command({
+        cmd: 'notify',
+        type: 'error',
+        message: e.message
+      });
+    }
+
+    target.disabled = false;
+  });
 };
 
 // keyboard support
 onkeydown = e => {
-  if ((e.key.toLowerCase() === 'f' && (e.ctrlKey || e.metaKey))) {
+  const meta = e.ctrlKey || e.metaKey;
+
+  if (e.key.toLowerCase() === 'f' && meta) {
     e.preventDefault();
     self.search.focus();
 
     return;
   }
-  if ((e.key.toLowerCase() === 'c' && (e.ctrlKey || e.metaKey)) || e.key === 'Enter') {
+  if ((e.key.toLowerCase() === 'c' && meta) || e.key === 'Enter') {
     e.preventDefault();
     self.copy.click();
 
     return;
+  }
+  if (e.key.toLowerCase() === 'e' && meta) {
+    e.preventDefault();
+    self.edit.click();
   }
 
   // If search input is focused
@@ -165,8 +268,10 @@ self.tbody.ondblclick = () => self.copy.click();
 
 // generate otp
 const generate = entry => {
-  if (generate.entry !== entry) {
-    generate.entry = entry;
+  if (current.entry !== entry) {
+    current.entry = entry;
+
+    console.log(entry);
 
     const now = (Date.now() / 1000);
     const timeIntoPeriod = now % entry.info.period;
@@ -178,10 +283,15 @@ const generate = entry => {
 
     generate.run();
     self.copy.disabled = false;
+    self.edit.disabled = false;
   }
 };
 generate.run = async () => {
-  const {entry} = generate;
+  const {entry} = current;
+
+  if (!entry) {
+    return;
+  }
 
   const token = generate.token = await otplib.generate({
     secret: entry.info.secret,
@@ -206,20 +316,21 @@ generate.run = async () => {
 generate.stop = () => {
   self.progress.classList.remove('progress');
   self.copy.disabled = true;
-  delete generate.entry;
+  self.edit.disabled = true;
+  delete current.entry;
 };
 document.onchange = e => {
   const {entry} = e.target;
   if (entry) {
     generate(entry);
   }
-  else if (!generate.entry) {
+  else if (!current.entry) {
     generate.stop();
     self.code.textContent = 'Select an item to show OTP';
   }
 };
 self.progress.addEventListener('animationend', () => {
-  if (generate.entry) {
+  if (current.entry) {
     self.progress.style.setProperty('--initial', '0s');
 
     self.progress.classList.remove('progress');
@@ -249,3 +360,124 @@ self.progress.addEventListener('animationend', () => {
     }, 750);
   };
 }
+
+// edit
+const commands = {
+  'remove-icon': false,
+  'remove-groups': []
+};
+self.edit.onclick = () => {
+  // reset
+  commands['remove-groups'].length = 0;
+  commands['remove-icon'] = false;
+
+  self.editor.querySelector('input[name=name]').value = current.entry.name;
+  self.editor.querySelector('input[name=issuer]').value = current.entry.issuer;
+  self.editor.querySelector('select[name=groups]').textContent = '';
+  for (const [uuid, name] of groups.entries()) {
+    const option = document.createElement('option');
+    option.value = uuid;
+    option.textContent = name;
+    option.selected = current.entry.groups.includes(uuid);
+    self.editor.querySelector('select[name=groups]').append(option);
+  }
+  self.editor.querySelector('select[name=groups]').dispatchEvent(new Event('change'));
+  self.editor.querySelector('input[name=remove-icon]').onclick = () => {
+    commands['remove-icon'] = true;
+  };
+  self.editor.querySelector('form').onsubmit = e => {
+    e.preventDefault();
+
+    current.entry.name = self.editor.querySelector('input[name=name]').value;
+    current.entry.issuer = self.editor.querySelector('input[name=issuer]').value;
+    current.entry.groups = [...self.editor.querySelector('select[name=groups]').selectedOptions].map(o => o.value);
+    if (commands['remove-icon']) {
+      current.entry.icon = null;
+      delete current.entry['icon_hash'];
+      delete current.entry['icon_mime'];
+    }
+    else if (commands.icon) {
+      current.entry.icon = commands.icon;
+      current.entry['icon_hash'] = commands['icon_hash'];
+      current.entry['icon_mime'] = commands['icon_mime'];
+    }
+    for (const uuid of commands['remove-groups']) {
+      groups.delete(uuid);
+    }
+
+    document.dispatchEvent(new Event('save'));
+  };
+
+  self.editor.showModal();
+};
+self.editor.querySelector('input[name=close]').onclick = () => self.editor.close();
+self.editor.querySelector('input[name=has-groups]').onchange = e => {
+  if (e.target.checked ) {
+    if (self.editor.querySelector('select[name=groups]').selectedIndex === -1) {
+      e.target.checked = false;
+    }
+  }
+  else {
+    self.editor.querySelector('select[name=groups]').selectedIndex = -1;
+  }
+};
+self.editor.querySelector('select[name=groups]').onchange = e => {
+  if (e.target.selectedIndex === -1) {
+    self.editor.querySelector('input[name=has-groups]').checked = false;
+    self.editor.querySelector('input[name=delete-groups]').disabled = true;
+  }
+  else {
+    self.editor.querySelector('input[name=has-groups]').checked = true;
+    self.editor.querySelector('input[name=delete-groups]').disabled = false;
+  }
+};
+self.editor.querySelector('input[name=add-a-group]').onclick = () => {
+  const name = prompt('Group Name:');
+  if (name) {
+    for (const n of groups.values()) {
+      if (n === name) {
+        return parent.command({
+          cmd: 'notify',
+          message: 'Group name already exists',
+          type: 'error'
+        });
+      }
+    }
+    const uuid = crypto.randomUUID();
+    groups.set(uuid, name);
+
+    const option = document.createElement('option');
+    option.value = uuid;
+    option.textContent = name;
+    option.selected = true;
+    self.editor.querySelector('select[name=groups]').append(option);
+    self.editor.querySelector('select[name=groups]').dispatchEvent(new Event('change'));
+    option.scrollIntoViewIfNeeded();
+  }
+};
+self.editor.querySelector('input[name=delete-groups]').onclick = e => {
+  for (const option of self.editor.querySelector('select[name=groups]').selectedOptions) {
+    const uuid = option.value;
+    commands['remove-groups'].push(uuid);
+    option.remove();
+  }
+  self.editor.querySelector('select[name=groups]').dispatchEvent(new Event('change'));
+};
+self.editor.querySelector('input[name=icon]').onchange = async e => {
+  try {
+    const file = e.target.files[0];
+    const blob = await new Response(file).blob();
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const base64 = btoa(String.fromCharCode(...bytes));
+    commands['remove-icon'] = false;
+    commands.icon = base64;
+    const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
+    commands['icon_hash'] = [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+    commands['icon_mime'] = blob.type;
+    e.value = '';
+  }
+  catch (e) {
+    alert('Icon is too large?\n\n' + e.message);
+  }
+};

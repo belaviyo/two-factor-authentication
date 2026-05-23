@@ -39,7 +39,7 @@ class Storage {
       const fileStore = transaction.objectStore(storage);
       const request = fileStore.add(value);
 
-      request.onsuccess = () => resolve();
+      request.onsuccess = () => resolve(request.result);
 
       request.onerror = e => reject(Error(e.target.error));
       transaction.onerror = e => reject(Error(e.target.error));

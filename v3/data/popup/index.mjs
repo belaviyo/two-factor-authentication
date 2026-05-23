@@ -1,0 +1,15 @@
+self.command = request => {
+  console.log(request);
+
+  if (request.cmd === 'navigate') {
+    const iframe = document.getElementById('app-frame');
+    iframe.onload = () => {
+      console.log(request.data);
+      iframe.contentWindow.postMessage(request.data, '*');
+    };
+    iframe.src = request.href;
+  }
+  else if (request.cmd === 'notify') {
+    self.toast.notify(request.message, request.type);
+  }
+};
