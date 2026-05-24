@@ -1,7 +1,7 @@
 {
   "name": "2FA (Two-Factor Authentication)",
   "description": "Portable and Secure Two-Factor Authentication Using the Aegis Local Database",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "manifest_version": 3,
   "offline_enabled": true,
   "permissions": [
@@ -15,7 +15,7 @@
     "scripts": ["worker.js"]
   },
   "action": {
-    "default_popup": "data/popup/index.html"
+    "default_popup": "data/popup/index.html?mode=popup"
   },
   "icons": {
     "16": "data/icons/16.png",

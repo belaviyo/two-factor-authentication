@@ -14,7 +14,9 @@ const sorting = {
   direction: 1,
   perform(entries) {
     entries.sort((a, b) => {
-      return a[sorting.name].localeCompare(b[sorting.name]) * sorting.direction;
+      const af = a[sorting.name].trim();
+      const bf = b[sorting.name].trim();
+      return af.localeCompare(bf) * sorting.direction;
     });
     start(entries);
     if (sorting.name === 'name') {
@@ -26,6 +28,15 @@ const sorting = {
       document.getElementById('sort-by-issuer').textContent = 'Issuer ' + (sorting.direction === 1 ? '↓' : '↑');
     }
   }
+};
+
+const changed = () => {
+  self.save.disabled = false;
+  onbeforeunload = e => {
+    e.preventDefault();
+    // required for Chrome
+    return (e.returnValue = '');
+  };
 };
 
 const start = entries => {
@@ -61,8 +72,15 @@ const start = entries => {
     e.entry = entry;
 
     const label = clone.firstElementChild;
+    label.setAttribute('order', n);
     map.set(n, label);
     self.tbody.append(label);
+
+    if (entry.selected) {
+      e.checked = true;
+      e.dispatchEvent(new Event('change', {bubbles: true}));
+      delete entry.selected;
+    }
   }
 
   // search
@@ -111,14 +129,18 @@ const start = entries => {
       reset();
     }
   };
-
-  map.get(0).click();
+  const radio = self.tbody.querySelector('input[type=radio]:checked');
+  if (radio) {
+    radio.scrollIntoViewIfNeeded();
+  }
+  else {
+    map.get(0).click();
+  }
   self.search.focus();
 };
 
 onmessage = e => {
   const {database, keypath, password} = e.data;
-
 
   for (const group of database.groups) {
     groups.set(group.uuid, group.name);
@@ -159,7 +181,7 @@ onmessage = e => {
 
       // backup
       if (prefs['backup-before-save']) {
-        const blob = new Blob([json1], {type: 'application/json'});
+        const blob = new Blob([JSON.stringify(json1, null, '  ')], {type: 'application/json'});
 
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -169,7 +191,6 @@ onmessage = e => {
         URL.revokeObjectURL(a.href);
         a.remove();
       }
-
 
       // is password valid?
       e.target.value = 'Decrypt...';
@@ -181,6 +202,8 @@ onmessage = e => {
       for (const [uuid, name] of groups.entries()) {
         database.groups.push({uuid, name});
       }
+      // clean up
+      database.entries = database.entries.filter(o => o.deleted !== true);
 
       e.target.value = 'Encrypt...';
       const json2 = await vault.encrypt(password, database);
@@ -192,6 +215,7 @@ onmessage = e => {
 
       e.target.value = 'Save';
       onbeforeunload = undefined;
+      self.save.disabled = true;
     }
     catch (e) {
       console.error(e);
@@ -201,17 +225,27 @@ onmessage = e => {
         message: e.message
       });
     }
-
-    e.target.disabled = false;
   };
 
-  // document.addEventListener('sort', () => sorting.perform(database.entries));
+  document.addEventListener('sort', () => sorting.perform(database.entries));
+
+  document.addEventListener('entry', e => {
+    database.entries.push(e.detail);
+    sorting.perform(database.entries, e.detail.uuid);
+  });
 };
 
 // keyboard support
 onkeydown = e => {
   const meta = e.ctrlKey || e.metaKey;
 
+
+  const dlg = document.querySelector('dialog:open');
+  if (e.key === 'Escape' && dlg.open) {
+    e.preventDefault();
+    self.editor.close();
+    return;
+  }
   if (e.key.toLowerCase() === 'f' && meta) {
     e.preventDefault();
     self.search.focus();
@@ -227,6 +261,10 @@ onkeydown = e => {
   if (e.key.toLowerCase() === 'e' && meta) {
     e.preventDefault();
     self.edit.click();
+  }
+  if (e.key.toLowerCase() === 's' && meta) {
+    e.preventDefault();
+    self.save.click();
   }
 
   // If search input is focused
@@ -258,6 +296,7 @@ const generate = entry => {
     generate.run();
     self.copy.disabled = false;
     self.edit.disabled = false;
+    self.delete.disabled = false;
   }
 };
 generate.run = async () => {
@@ -267,30 +306,34 @@ generate.run = async () => {
     return;
   }
 
-  const token = generate.token = await otplib.generate({
-    secret: entry.info.secret,
-    strategy: entry.type, // "totp" or "hotp"
+  try {
+    const token = generate.token = await otplib.generate({
+      secret: entry.info.secret,
+      strategy: entry.type, // "totp" or "hotp"
 
-    // HOTP only (ignored for TOTP)
-    counter: entry.type === 'hotp' ? entry.counter : undefined,
+      // HOTP only (ignored for TOTP)
+      counter: entry.type === 'hotp' ? entry.info.counter : undefined,
 
-    // TOTP config
-    period: entry.info.period,
-    digits: entry.info.digits,
-    algorithm: entry.info.algo.toLowerCase(), // "sha1"
-    guardrails: otplib.createGuardrails({
-      MIN_SECRET_BYTES: 10
-    })
-  });
-  self.code.textContent = token.length === 6 ? (token.slice(0, 3) + ' ' + token.slice(3)) : token;
-  if (entry.info.period) {
-    // generate.timeout = setTimeout(generate.run, (remaining) * 1000);
+      // TOTP config
+      period: entry.info.period,
+      digits: entry.info.digits,
+      algorithm: entry.info.algo.toLowerCase(), // "sha1"
+      guardrails: otplib.createGuardrails({
+        MIN_SECRET_BYTES: 10
+      })
+    });
+    self.code.textContent = token.length === 6 ? (token.slice(0, 3) + ' ' + token.slice(3)) : token;
+  }
+  catch (e) {
+    console.error(e);
+    self.code.textContent = e.message;
   }
 };
 generate.stop = () => {
   self.progress.classList.remove('progress');
   self.copy.disabled = true;
   self.edit.disabled = true;
+  self.delete.disabled = true;
   delete current.entry;
 };
 document.onchange = e => {
@@ -322,15 +365,15 @@ self.progress.addEventListener('animationend', () => {
     clearTimeout(id);
     try {
       await navigator.clipboard.writeText(generate.token);
-      e.target.value = 'Done';
+      e.target.textContent = 'Done';
     }
     catch (e) {
       console.error(e);
-      e.target.value = 'Error';
+      e.target.textContent = 'Error';
     }
 
     id = setTimeout(() => {
-      e.target.value = 'Copy';
+      e.target.textContent = 'Copy OTP';
     }, 750);
   };
 }
@@ -417,13 +460,8 @@ self.edit.onclick = () => {
 
     self.editor.close();
 
-    document.dispatchEvent(new Event('sort'));
-    self.save.disabled = false;
-    onbeforeunload = e => {
-      e.preventDefault();
-      // required for Chrome
-      return (e.returnValue = '');
-    };
+    // document.dispatchEvent(new Event('sort'));
+    changed();
   };
 
   self.editor.showModal();
@@ -535,4 +573,99 @@ document.getElementById('sort-by-issuer').onclick = () => {
     sorting.name = 'issuer';
   }
   document.dispatchEvent(new Event('sort'));
+};
+
+self.delete.onclick = () => {
+  if (confirm('Are you sure you want to delete the selected OTP?') === false) {
+    return;
+  }
+
+  const label = self.tbody.querySelector('label:has(input:checked)');
+  const {entry} = label.querySelector('input[type=radio]');
+  entry.deleted = true;
+  const n = Number(label.getAttribute('order'));
+  label.remove();
+  map.delete(n);
+  if (map.has(n - 1)) {
+    map.get(n - 1).querySelector('input[type=radio]').checked = true;
+    map.get(n - 1).querySelector('input[type=radio]').dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  if (map.has(n + 1)) {
+    map.get(n + 1).querySelector('input[type=radio]').checked = true;
+    map.get(n + 1).querySelector('input[type=radio]').dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  changed();
+};
+
+self.new.onclick = () => {
+  try {
+    const uri = prompt('Enter URI');
+    if (!uri) {
+      return;
+    }
+
+    const url = new URL(uri);
+
+    if (url.protocol !== 'otpauth:') {
+      throw new Error('Invalid OTP URI');
+    }
+
+    // totp / hotp
+    const type = url.host;
+    if (type !== 'totp' && type !== 'hotp') {
+      throw Error('Invalid OTP type');
+    }
+
+    // Label format:
+    // otpauth://totp/Issuer:Account
+    const rawLabel = decodeURIComponent(url.pathname.slice(1));
+
+    let issuerFromLabel = '';
+    let name = rawLabel;
+
+    if (rawLabel.includes(':')) {
+      const parts = rawLabel.split(':');
+      issuerFromLabel = parts.shift().trim();
+      name = parts.join(':').trim();
+    }
+
+    const params = url.searchParams;
+
+    const issuer = params.get('issuer') || issuerFromLabel || null;
+
+    const detail = {
+      favorite: false,
+      groups: [],
+      icon: null,
+      info: {
+        secret: params.get('secret') || null,
+        algo: (params.get('algorithm') || 'SHA1').toUpperCase(),
+        digits: Number(params.get('digits') || 6)
+      },
+      issuer,
+      name,
+      note: '',
+      type, // totp | hotp
+      uuid: crypto.randomUUID(),
+      selected: true
+    };
+    if (type === 'otp') {
+      detail.info.period = Number(params.get('period') || 30);
+    }
+    else {
+      detail.info.counter = params.has('counter') ? Number(params.get('counter')) : null;
+    }
+
+    document.dispatchEvent(new CustomEvent('entry', {
+      detail
+    }));
+  }
+  catch (e) {
+    console.error(e);
+    parent.command({
+      cmd: 'notify',
+      type: 'error',
+      message: e.message
+    });
+  }
 };

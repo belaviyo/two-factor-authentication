@@ -8,7 +8,17 @@
 </head>
 <body>
   <div id="progress"></div>
-  <h1>2FA (Two-Factor Authentication)</h1>
+  <header>
+    <h1>2FA (Two-Factor Authentication)</h1>
+    <div class="tools">
+      <button id="new" accesskey="n" aria-label="New item" title="New Item
+Ctrl + N or Command + N">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <path d="M19 11H13V5H11V11H5V13H11V19H13V13H19Z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
   <div id="search-container" title="Press Ctrl + F (or Command + F on Mac) to search. Use the arrow keys to navigate through the items.">
     <input type="search" id="search" autofocus placeholder="Search">
   </div>
@@ -36,10 +46,10 @@
   <footer>
     <span id="code">Select an item to show OTP</span>
     <div>
-      <button id="save" disabled accesskey="s"><u>S</u>ave</button>
+      <button id="save" disabled accesskey="s"><u>S</u>ave Database</button>
       <button id="edit" disabled accesskey="e"><u>E</u>dit</button>
-      <button id="copy" disabled accesskey="c"><u>C</u>opy</button>
-      <button id="new" disabled accesskey="n"><u>N</u>ew</button>
+      <button id="delete" disabled accesskey="d"><u>D</u>elete</button>
+      <button id="copy" disabled accesskey="c"><u>C</u>opy OTP</button>
     </div>
   </footer>
   <dialog id="editor" popover>
@@ -52,7 +62,7 @@
       <div>
         <template id="img">
           <label class="icon">
-            <img width="16">
+            <img width="24">
             <input type="radio" name="icon">
           </label>
         </template>

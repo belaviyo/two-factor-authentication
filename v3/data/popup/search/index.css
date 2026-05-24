@@ -20,6 +20,7 @@ body {
   width: 100%;
   display: grid;
   grid-template-columns: 48px 1fr min-content min-content 0;
+  grid-gap: 0 var(--gap);
 
   @media (width < 500px) {
     grid-template-columns: 48px 2fr 1fr 0 0;
@@ -73,24 +74,47 @@ body {
   display: none;
 }
 
-footer {
-  padding: var(--gap);
-  background-color: var(--bg-alt);
+header {
   display: grid;
   grid-template-columns: 1fr;
   align-items: center;
 
   & > * {
-    grid-column: 1 / 1;
     grid-row: 1 / 1;
+    grid-column: 1 / 1;
   }
+  .tools {
+    text-align: end;
+    padding-inline: 10px;
+  }
+  button {
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    text-shadow: none;
+
+    svg {
+      pointer-events: none;
+    }
+  }
+}
+footer {
+  padding: var(--gap);
+  background-color: var(--bg-alt);
+  display: grid;
+  grid-template-columns: 1fr min-content;
+  align-items: center;
+  white-space: nowrap;
 
   & > div {
     justify-self: end;
   }
   #code {
     font-weight: bold;
-    text-align: center;
+    padding-inline-start: var(--gap);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -147,7 +171,7 @@ footer {
   fieldset[name=icons] {
     padding: var(--gap);
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     grid-gap: var(--gap);
     max-height: 3lh;
     overflow-y: auto;
@@ -162,15 +186,4 @@ footer {
       border-color: red;
     }
   }
-}
-
-
-
-input[type="file"]::file-selector-button {
-  padding: 8px 16px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  background: #f5f5f5;
-  cursor: pointer;
-  font: inherit;
 }
