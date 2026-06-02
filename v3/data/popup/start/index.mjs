@@ -1,6 +1,10 @@
 import {AegisVault} from '../aegis/core.mjs';
 
-const open = (database, keypath) => {
+const open = async (database, keypath) => {
+  if (keypath) {
+    await chrome.storage.local.set({keypath});
+  }
+
   parent.command({
     cmd: 'navigate',
     href: 'search/index.html',
@@ -26,6 +30,8 @@ const save = async handle => {
 };
 
 self.openDB.onclick = async e => {
+  e.preventDefault();
+
   try {
     e.target.disabled = true;
 
@@ -85,19 +91,12 @@ self.openDB.onclick = async e => {
 };
 
 self.createDB.onclick = async e => {
+  e.preventDefault();
+
   try {
-    const cp = prompt('Re-enter the password');
-    if (cp !== self.password.value) {
-      throw Error('Passwords do not match');
-    }
-
-    const prefs = await chrome.storage.local.get({
-      'password-on-session': false,
-      'handle-on-indexdb': true
-    });
-
     e.target.disabled = true;
     e.target.value = 'Select File...';
+
     const handle = await window.showSaveFilePicker({
       suggestedName: 'vault.json',
       types: [
@@ -110,6 +109,16 @@ self.createDB.onclick = async e => {
       ],
       excludeAcceptAllOption: true
     });
+
+    const prefs = await chrome.storage.local.get({
+      'password-on-session': false,
+      'handle-on-indexdb': true
+    });
+
+    const cp = prompt('Re-enter the password');
+    if (cp !== self.password.value) {
+      throw Error('Passwords do not match');
+    }
 
     e.target.value = 'Creating DB...';
     const vault = await AegisVault.create(cp);
@@ -146,7 +155,11 @@ self.createDB.onclick = async e => {
   }
   catch (e) {
     console.error(e);
-    self.toast.notify(e.message || 'Wrong password. Try again...', 'error');
+    parent.command({
+      cmd: 'notify',
+      type: 'error',
+      message: e.message || 'Wrong password. Try again...'
+    });
     self.password.focus();
   }
   e.target.disabled = false;
@@ -155,33 +168,41 @@ self.createDB.onclick = async e => {
 
 self.password.oninput = e => {
   const b = e.target.checkValidity();
-  self.openDB.disabled = self.stored.disabled = b === false;
+  self.openDB.disabled = self.createDB.disabled = self.stored.disabled = b === false;
 };
 
-storage.open([{
-  name: 'handles'
-}]).then(async () => {
+chrome.storage.local.get({
+  keypath: -1
+}).then(async prefs => {
+  await storage.open([{
+    name: 'handles'
+  }]);
   for (const o of await storage.list('handles')) {
     const option = document.createElement('option');
     option.textContent = o.value.name;
     option.handle = o.value;
-    option.keypath = o.keypath;
+    option.value = option.keypath = o.keypath;
+    if (prefs.keypath === o.keypath) {
+      self.last.disabled = false;
+      self.last.keypath = o.keypath;
+      self.last.title = o.value.name;
+    }
     self.stored.append(option);
   }
 });
 
 self.stored.onchange = async e => {
+  e.preventDefault();
+
   const option = e.target.selectedOptions[0];
   const {handle, keypath} = option;
+
   if (handle) {
     try {
-      const prefs = await chrome.storage.local.get({
-        'password-on-session': false
-      });
-
       // If already granted, return true
       if ((await handle.queryPermission({mode: 'read'})) !== 'granted') {
         const p = await handle.requestPermission({mode: 'read'});
+
         if (p !== 'granted') {
           throw Error('Permission is: ' + p);
         }
@@ -193,6 +214,10 @@ self.stored.onchange = async e => {
 
       const vault = new AegisVault(json);
       const db = await vault.decrypt(self.password.value);
+
+      const prefs = await chrome.storage.local.get({
+        'password-on-session': false
+      });
 
       // store password?
       if (prefs['password-on-session']) {
@@ -212,7 +237,11 @@ self.stored.onchange = async e => {
         e.target.selectedIndex = 0;
       }
 
-      self.toast.notify(e.message || 'Wrong password. Try again...', 'error');
+      parent.command({
+        cmd: 'notify',
+        type: 'error',
+        message: e.message || 'Wrong password. Try again...'
+      });
       self.password.focus();
       self.stored.selectedIndex = 0;
     }
@@ -250,3 +279,34 @@ chrome.storage.local.get({
     });
   }
 });
+
+self.last.onclick = e => {
+  e.preventDefault();
+
+  self.stored.value = self.last.keypath;
+  self.stored.dispatchEvent(new Event('change'));
+};
+
+// keyboard support
+onkeydown = e => {
+  const meta = e.ctrlKey || e.metaKey;
+
+  if (e.key.toLowerCase() === 'o' && meta) {
+    e.preventDefault();
+    self.openDB.click();
+
+    return;
+  }
+  if (e.key.toLowerCase() === 'n' && meta) {
+    e.preventDefault();
+    self.createDB.click();
+
+    return;
+  }
+  if (e.key.toLowerCase() === 'l' && meta) {
+    e.preventDefault();
+    self.last.click();
+
+    return;
+  }
+};

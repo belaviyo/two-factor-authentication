@@ -4,6 +4,7 @@
   --bg: #fff;
   --bg-alt: #ecefff;
   --bd: #ddd;
+  --bd-alt: rgba(0, 0, 0, 0.25);
 }
 
 @view-transition {
@@ -35,7 +36,7 @@ select,
 button,
 textarea,
 input {
-  border: solid 1px rgba(0, 0, 0, 0.25);
+  border: solid 1px var(--bd-alt);
 }
 button:disabled,
 input[type=submit]:disabled,

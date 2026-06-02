@@ -8,16 +8,17 @@
 </head>
 <body>
   <h1>2FA (Two-Factor Authentication)</h1>
-  <form id="content" action="../search/index.html" method="POST">
+  <form id="content">
     <span>Enter</span>
     <input type="password" id="password" placeholder="Password" minlength="4" required autofocus title="min password length is 4 chars">
     <span>to</span>
-    <input type="submit" id="openDB" value="Open a Database" disabled>
-    <input type="button" id="createDB" value="Create a new Database" disabled>
+    <button type="submit" id="openDB" accesskey="o" disabled><u>O</u>pen a Database</button>
+    <button id="createDB" accesskey="n" disabled>Create a <u>n</u>ew Database</button>
     <span>or use</span>
     <select id="stored" disabled>
       <option>Select Handle</option>
     </select>
+    <button id="last" accesskey="l" disabled>Use <u>L</u>ast Handle</button>
   </form>
   <footer>
     <input type="button" id="reset" value="Clear Stored Handles">

@@ -157,8 +157,9 @@ footer {
     & > div {
       display: flex;
       gap: var(--gap);
-      justify-self: end;
-      align-items: center;
+      justify-content: end;
+      align-items: start;
+      width: 100%;
     }
   }
   input[type=file] {
@@ -174,8 +175,13 @@ footer {
     grid-template-columns: repeat(4, 1fr);
     grid-gap: var(--gap);
     max-height: 3lh;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: auto hidden;
+    flex: 1;
+    border: solid 1px var(--bd-alt);
+
+    &:empty {
+      display: none;
+    }
 
     label {
       border: solid 1px transparent;

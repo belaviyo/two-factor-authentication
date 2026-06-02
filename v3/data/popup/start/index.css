@@ -16,6 +16,7 @@ body {
   }
 
   select,
+  button,
   input {
     width: 100%;
     box-sizing: border-box;
@@ -29,6 +30,9 @@ body {
   }
   input[type=password]:valid {
     border: 2px solid green;
+  }
+  select {
+    text-align: center;
   }
   select:empty {
     display: none;

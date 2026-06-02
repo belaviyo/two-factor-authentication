@@ -93,8 +93,10 @@ const start = entries => {
       label.classList.remove('nomatch');
       self.tbody.appendChild(label); // re-order labels
     }
-    map.get(0).querySelector('input[type=radio]').checked = true;
-    map.get(0).querySelector('input[type=radio]').dispatchEvent(new Event('change', {bubbles: true}));
+    if (map.size) {
+      map.get(0).querySelector('input[type=radio]').checked = true;
+      map.get(0).querySelector('input[type=radio]').dispatchEvent(new Event('change', {bubbles: true}));
+    }
   };
 
   self.search.oninput = e => {
@@ -134,7 +136,7 @@ const start = entries => {
     radio.scrollIntoViewIfNeeded();
   }
   else {
-    map.get(0).click();
+    map.get(0)?.click();
   }
   self.search.focus();
 };
@@ -285,6 +287,10 @@ const generate = entry => {
   if (current.entry !== entry) {
     current.entry = entry;
 
+    if (entry.type === 'totp') {
+      entry.info.period = entry.info.period || 30;
+    }
+
     const now = (Date.now() / 1000);
     const timeIntoPeriod = now % entry.info.period;
     self.progress.style.setProperty('--period', entry.info.period + 's');
@@ -302,10 +308,15 @@ const generate = entry => {
 generate.run = async () => {
   const {entry} = current;
 
+
   if (!entry) {
     return;
   }
 
+  const format = token => {
+    return token.length >= 6 && token.length % 2 === 0 ?
+      token.slice(0, token.length / 2) + ' ' + token.slice(token.length / 2) : token;
+  };
   try {
     const token = generate.token = await otplib.generate({
       secret: entry.info.secret,
@@ -319,10 +330,10 @@ generate.run = async () => {
       digits: entry.info.digits,
       algorithm: entry.info.algo.toLowerCase(), // "sha1"
       guardrails: otplib.createGuardrails({
-        MIN_SECRET_BYTES: 10
+        MIN_SECRET_BYTES: 1
       })
     });
-    self.code.textContent = token.length === 6 ? (token.slice(0, 3) + ' ' + token.slice(3)) : token;
+    self.code.textContent = format(token);
   }
   catch (e) {
     console.error(e);
@@ -412,7 +423,7 @@ self.edit.onclick = () => {
   }
 
   self.editor.querySelector('input[name=remove-icon]').onclick = () => {
-    const icon = self.editor.querySelector('.icons input:checked');
+    const icon = self.editor.querySelector('fieldset[name=icons] input:checked');
     if (icon) {
       icon.checked = false;
     }
@@ -659,6 +670,7 @@ self.new.onclick = () => {
     document.dispatchEvent(new CustomEvent('entry', {
       detail
     }));
+    changed();
   }
   catch (e) {
     console.error(e);
