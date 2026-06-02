@@ -175,7 +175,7 @@ footer {
     grid-template-columns: repeat(4, 1fr);
     grid-gap: var(--gap);
     max-height: 3lh;
-    overflow: auto hidden;
+    overflow: hidden auto;
     flex: 1;
     border: solid 1px var(--bd-alt);
 
@@ -183,13 +183,16 @@ footer {
       display: none;
     }
 
+    img {
+      justify-self: center;
+    }
     label {
       border: solid 1px transparent;
       display: grid;
       grid-template-columns: 1fr 0;
     }
     label:has(input:checked) {
-      border-color: red;
+      background-color: var(--bg-active);
     }
   }
 }
