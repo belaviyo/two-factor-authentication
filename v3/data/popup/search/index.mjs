@@ -167,7 +167,6 @@ onmessage = e => {
       const o = await storage.read('handles', keypath);
       const handle = o.value;
 
-
       e.target.value = 'Ask permission...';
       const p = await handle.queryPermission({mode: 'readwrite'});
       if (p !== 'granted') {

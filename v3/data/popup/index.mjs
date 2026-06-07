@@ -5,6 +5,8 @@ if (args.get('mode') === 'popup') {
 
 self.command = request => {
   if (request.cmd === 'navigate') {
+    self.toast.clean();
+
     const iframe = document.getElementById('app-frame');
     iframe.onload = () => {
       iframe.contentWindow.postMessage(request.data, '*');

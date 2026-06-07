@@ -1,6 +1,68 @@
+FileSystemFileHandle.prototype.isSameEntry = new Proxy(FileSystemFileHandle.prototype.isSameEntry, {
+  apply(target, self, args) {
+    if (self.kind === 'remote' && args[0].kind !== 'remote') {
+      return false;
+    }
+    if (self.kind !== 'remote' && args[0].kind === 'remote') {
+      return false;
+    }
+    if (self.kind === 'remote' && args[0].kind === 'remote') {
+      return self.href === args[0].href;
+    }
+    return Reflect.apply(target, self, args);
+  }
+});
+
+
 class Storage {
   #DB_NAME = 'file-storage';
   #db;
+
+  static remote(o) {
+    o.name = o.href;
+
+    o.isSameEntry = FileSystemFileHandle.prototype.isSameEntry.bind(o);
+
+    o.getFile = async () => {
+      const res = await fetch(o.href);
+      const blob = await res.blob();
+
+      if (blob.type.includes('/json') === false) {
+        throw Error('Remote is not JSON');
+      }
+
+      return new File([blob], this.name, {type: blob.type});
+    };
+
+    o.createWritable = async () => {
+      let buffer = await (await fetch(o.href)).blob();
+
+      return {
+        write(data) {
+          if (typeof data === 'string') {
+            buffer = new Blob([data]);
+          }
+          else {
+            throw Error('only string is supported for remote source');
+          }
+        },
+        close: () => {
+          return fetch(o.href, {
+            method: 'POST',
+            body: buffer
+          }).then(r => {
+            if (!r.ok) {
+              throw Error('cannot write on server; ' + r.statusText + '[' + r.status + ']');
+            }
+          });
+        }
+      };
+    };
+    o.queryPermission = () => chrome.permissions.request({
+      origins: [o.href]
+    }).then(b => b ? 'granted' : 'denied');
+    return o;
+  }
 
   constructor(name = 'file') {
     this.#DB_NAME = name;
@@ -32,6 +94,13 @@ class Storage {
     this.#db.close();
   }
   put(storage, value) {
+    if (value.kind === 'remote') {
+      value = {
+        kind: 'remote',
+        href: value.href
+      };
+    }
+
     return new Promise((resolve, reject) => {
       const transaction = this.#db.transaction(storage, 'readwrite');
 
@@ -51,10 +120,21 @@ class Storage {
       const store = transaction.objectStore(storage);
 
       const request = store.get(keypath);
-      request.onsuccess = () => resolve({
-        keypath,
-        value: request.result
-      });
+
+      request.onsuccess = () => {
+        if (request.result.kind === 'remote') {
+          resolve({
+            keypath,
+            value: Storage.remote(request.result)
+          });
+        }
+        else {
+          resolve({
+            keypath,
+            value: request.result
+          });
+        }
+      };
       request.onerror = e => reject(Error('getHandle, ' + e.target.error));
     });
   }
@@ -78,10 +158,18 @@ class Storage {
       transaction.objectStore(storage).openCursor().onsuccess = e => {
         const cursor = e.target.result;
         if (cursor) {
-          values.push({
-            keypath: cursor.key,
-            value: cursor.value
-          });
+          if (cursor.value.kind === 'remote') {
+            values.push({
+              keypath: cursor.key,
+              value: Storage.remote(cursor.value)
+            });
+          }
+          else {
+            values.push({
+              keypath: cursor.key,
+              value: cursor.value
+            });
+          }
           cursor.continue();
         }
       };
@@ -90,4 +178,3 @@ class Storage {
     });
   }
 }
-

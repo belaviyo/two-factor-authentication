@@ -20,12 +20,14 @@ const storage = new Storage('file');
 const save = async handle => {
   // only save if it is a new handle
   const handles = await storage.list('handles');
+
   for (const {value} of handles) {
     if (await value.isSameEntry(handle)) {
       console.info('handle is already stored');
       return;
     }
   }
+
   return await storage.put('handles', handle);
 };
 
@@ -88,6 +90,73 @@ self.openDB.onclick = async e => {
   }
   e.target.disabled = false;
   e.target.value = 'Open a Database';
+};
+
+self.openRemote.onclick = async e => {
+  e.preventDefault();
+
+  try {
+    e.target.disabled = true;
+
+    const prefs = await chrome.storage.local.get({
+      'password-on-session': false,
+      'handle-on-indexdb': true,
+      'last-remote-source': ''
+    });
+
+    e.target.value = 'Select Source...';
+    const href = prompt('Select remote source', prefs['last-remote-source']);
+    if (!href) {
+      throw Error('User Aborted');
+    }
+    const handle = Storage.remote({
+      kind: 'remote',
+      href
+    });
+
+    if ((await handle.queryPermission({mode: 'read'})) !== 'granted') {
+      throw Error('Permission Denied');
+    }
+
+    const file = await handle.getFile();
+    const json = await new Response(file).json();
+
+    // is password valid?
+    e.target.value = 'Processing File...';
+    const vault = new AegisVault(json);
+    const db = await vault.decrypt(self.password.value);
+
+    // store password?
+    if (prefs['password-on-session']) {
+      chrome.storage.session.set({
+        'password': self.password.value
+      });
+    }
+    // store remote
+    chrome.storage.local.set({
+      'last-remote-source': href
+    });
+
+    // store handle
+    let keypath;
+    if (prefs['handle-on-indexdb']) {
+      e.target.value = 'Storing Handle...';
+      keypath = await save(handle);
+    }
+
+    open(db, keypath);
+  }
+  catch (e) {
+    console.error(e);
+    parent.command({
+      cmd: 'notify',
+      type: 'error',
+      message: e.message || 'Wrong password. Try again...'
+    });
+    self.password.focus();
+  }
+  e.target.disabled = false;
+  e.target.value = 'Open Remote';
 };
 
 self.createDB.onclick = async e => {
@@ -168,7 +237,10 @@ self.createDB.onclick = async e => {
 
 self.password.oninput = e => {
   const b = e.target.checkValidity();
-  self.openDB.disabled = self.createDB.disabled = self.stored.disabled = b === false;
+  self.openDB.disabled =
+  self.openRemote.disabled =
+  self.createDB.disabled =
+  self.stored.disabled = b === false;
 };
 
 chrome.storage.local.get({
