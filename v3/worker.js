@@ -5,7 +5,7 @@ const once = async () => {
   once.done = true;
 
   const prefs = await chrome.storage.local.get({
-    'password-on-session': false,
+    'password-on-session': true,
     'handle-on-indexdb': true,
     'backup-before-save': true
   });

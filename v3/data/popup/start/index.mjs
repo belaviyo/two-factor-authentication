@@ -38,7 +38,7 @@ self.openDB.onclick = async e => {
     e.target.disabled = true;
 
     const prefs = await chrome.storage.local.get({
-      'password-on-session': false,
+      'password-on-session': true,
       'handle-on-indexdb': true
     });
 
@@ -99,7 +99,7 @@ self.openRemote.onclick = async e => {
     e.target.disabled = true;
 
     const prefs = await chrome.storage.local.get({
-      'password-on-session': false,
+      'password-on-session': true,
       'handle-on-indexdb': true,
       'last-remote-source': ''
     });
@@ -180,7 +180,7 @@ self.createDB.onclick = async e => {
     });
 
     const prefs = await chrome.storage.local.get({
-      'password-on-session': false,
+      'password-on-session': true,
       'handle-on-indexdb': true
     });
 
@@ -288,7 +288,7 @@ self.stored.onchange = async e => {
       const db = await vault.decrypt(self.password.value);
 
       const prefs = await chrome.storage.local.get({
-        'password-on-session': false
+        'password-on-session': true
       });
 
       // store password?
