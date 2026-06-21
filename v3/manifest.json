@@ -15,7 +15,8 @@
   "icons": {
   },
   "background": {
-    "service_worker": "worker.js"
+    "service_worker": "worker.js",
+    "scripts": ["worker.js"]
   },
   "action": {
     "default_popup": "data/popup/index.html?mode=popup"

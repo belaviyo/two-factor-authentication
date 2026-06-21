@@ -1,4 +1,4 @@
-/* global otplib */
+/* global otplib, tld */
 
 import {AegisVault} from '../aegis/core.mjs';
 import Fuse from './fuse.min.mjs';
@@ -8,6 +8,29 @@ const icons = new Map();
 const map = new Map();
 
 const current = {};
+
+// generate hash for icon
+const iconHashFromEntry = async entry => {
+  const binary = atob(entry.icon);
+  const iconBytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    iconBytes[i] = binary.charCodeAt(i);
+  }
+
+  const mimeBytes = new TextEncoder().encode(entry['icon_mime']);
+
+  const combined = new Uint8Array(
+    mimeBytes.length + iconBytes.length
+  );
+
+  combined.set(mimeBytes, 0);
+  combined.set(iconBytes, mimeBytes.length);
+
+  const hash = await crypto.subtle.digest('SHA-256', combined);
+
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+};
 
 const sorting = {
   name: 'name',
@@ -39,7 +62,7 @@ const changed = () => {
   };
 };
 
-const start = entries => {
+const start = async entries => {
   // clean
   self.tbody.textContent = '';
   map.clear();
@@ -57,7 +80,14 @@ const start = entries => {
 
     if (entry.icon) {
       clone.querySelector('[name=icon]').src = `data:${entry['icon_mime']};base64,` + entry.icon;
+
       if (icons.has(entry['icon_hash']) === false) {
+        // fix old wrong generated hashes
+        if (entry['icon_hash'].length !== 64) {
+          entry['icon_hash'] = await iconHashFromEntry(entry);
+          console.info('wrong icon hash detected', entry['icon_hash']);
+        }
+
         icons.set(entry['icon_hash'], {
           'icon': entry.icon,
           'icon_mime': entry['icon_mime']
@@ -139,6 +169,23 @@ const start = entries => {
     map.get(0)?.click();
   }
   self.search.focus();
+
+  // add custom icons
+  fetch('icons/map.json').then(r => r.json()).then(json => {
+    for (const [hash, o] of Object.entries(json)) {
+      const {path, mime} = o;
+
+      if (icons.has(hash) === false) {
+        icons.set(hash, {
+          'path': 'icons/' + path,
+          'icon_mime': mime
+        });
+      }
+      else {
+        icons.get(hash).path = 'icons/' + path;
+      }
+    }
+  });
 };
 
 onmessage = e => {
@@ -149,7 +196,7 @@ onmessage = e => {
   }
 
   sorting.perform(database.entries);
-  start(database.entries);
+  // start(database.entries);
 
   self.save.onclick = async e => {
     try {
@@ -164,6 +211,7 @@ onmessage = e => {
       await storage.open([{
         name: 'handles'
       }]);
+
       const o = await storage.read('handles', keypath);
       const handle = o.value;
 
@@ -220,6 +268,7 @@ onmessage = e => {
     }
     catch (e) {
       console.error(e);
+      self.save.disabled = false;
       parent.command({
         cmd: 'notify',
         type: 'error',
@@ -412,7 +461,17 @@ self.edit.onclick = () => {
   self.editor.querySelector('fieldset[name=icons]').textContent = '';
   for (const [uuid, o] of icons.entries()) {
     const clone = document.importNode(self.img.content, true);
-    clone.querySelector('img').src = `data:${o['icon_mime']};base64,` + o.icon;
+    if ('icon' in o) {
+      clone.querySelector('img').src = `data:${o['icon_mime']};base64,` + o.icon;
+    }
+    else {
+      clone.querySelector('img').src = o.path;
+    }
+
+    if ('path' in o) {
+      clone.querySelector('img').title = o.path.split('/').pop();
+    }
+
     const input = clone.querySelector('input[type=radio]');
     input.value = uuid;
     if (hash && hash === uuid) {
@@ -421,60 +480,131 @@ self.edit.onclick = () => {
     self.editor.querySelector('fieldset[name=icons]').append(clone.firstElementChild);
   }
 
+  self.editor.querySelector('input[name=find-icon]').onclick = () => {
+    let issuer = self.editor.querySelector('input[name=issuer]').value.toLowerCase();
+
+    // convert issuer from hostname to name
+    if (issuer.includes('.')) {
+      try {
+        const suffix = tld.getPublicSuffix(issuer);
+        if (suffix) {
+          issuer = tld.getDomain(issuer).replace('.' + suffix, '');
+        }
+      }
+      catch (e) {}
+    }
+
+    if (issuer) {
+      for (const [uuid, o] of icons.entries()) {
+        if (o.path) {
+          if (o.path.toLowerCase().includes(issuer)) {
+            const e = self.editor.querySelector('fieldset[name=icons]').querySelector(`input[value="${uuid}"]`);
+            if (e) {
+              e.checked = true;
+              e.scrollIntoViewIfNeeded();
+            }
+            return;
+          }
+        }
+      }
+      parent.command({
+        cmd: 'notify',
+        type: 'info',
+        message: 'Cannot find any icon for "' + issuer + '"'
+      });
+    }
+    else {
+      parent.command({
+        cmd: 'notify',
+        type: 'error',
+        message: 'This entry does not have an issuer'
+      });
+    }
+  };
   self.editor.querySelector('input[name=remove-icon]').onclick = () => {
     const icon = self.editor.querySelector('fieldset[name=icons] input:checked');
     if (icon) {
       icon.checked = false;
     }
   };
-  self.editor.querySelector('form').onsubmit = e => {
+  self.editor.querySelector('form').onsubmit = async e => {
     e.preventDefault();
+    e.submitter.disabled = true;
+    e.submitter.value = 'Please wait...';
 
-    const label = self.tbody.querySelector('label:has(input:checked)');
+    try {
+      const label = self.tbody.querySelector('label:has(input:checked)');
 
-    current.entry.name = label.querySelector('span[name=name]').textContent =
-      self.editor.querySelector('input[name=name]').value;
-    current.entry.issuer = label.querySelector('span[name=issuer]').textContent =
-      self.editor.querySelector('input[name=issuer]').value;
-    current.entry.groups = [...self.editor.querySelector('select[name=groups]').selectedOptions].map(o => o.value);
-    label.querySelector('span[name=groups]').textContent =
-      current.entry.groups.map(uuid => groups.get(uuid)).join(', ');
+      current.entry.name = label.querySelector('span[name=name]').textContent =
+        self.editor.querySelector('input[name=name]').value;
+      current.entry.issuer = label.querySelector('span[name=issuer]').textContent =
+        self.editor.querySelector('input[name=issuer]').value;
+      current.entry.groups = [...self.editor.querySelector('select[name=groups]').selectedOptions].map(o => o.value);
+      label.querySelector('span[name=groups]').textContent =
+        current.entry.groups.map(uuid => groups.get(uuid)).join(', ');
 
-    const icon = self.editor.querySelector('fieldset[name=icons] input[type=radio]:checked');
-    if (icon) {
-      current.entry['icon_hash'] = icon.value;
-      const o = icons.get(icon.value);
-      Object.assign(current.entry, o);
-      label.querySelector('img[name=icon]').src = `data:${o['icon_mime']};base64,` + o.icon;
-    }
-    else {
-      current.entry.icon = null;
-      delete current.entry['icon_hash'];
-      delete current.entry['icon_mime'];
-      label.querySelector('img[name=icon]').src = '';
-    }
-    // Fix groups
-    for (const uuid of commands['remove-groups']) {
-      groups.delete(uuid);
-    }
+      const icon = self.editor.querySelector('fieldset[name=icons] input[type=radio]:checked');
+      if (icon) {
+        current.entry['icon_hash'] = icon.value;
+        const o = icons.get(icon.value);
+        // icon is from default set and still have no data
+        if ('path' in o) {
+          o.icon = o.icon || await fetch(o.path).then(r => r.blob()).then(blob => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          }));
+        }
 
-    if (commands['remove-groups'].length) {
-      for (const label of map.values()) {
-        const {entry} = label.querySelector('input[type=radio]');
-        if (entry.groups.some(uuid => groups.has(uuid) === false)) {
-          entry.groups = entry.groups.filter(uuid => groups.has(uuid));
-          label.querySelector('[name=groups]').textContent = entry.groups.join(', ');
+        Object.assign(current.entry, o);
+        label.querySelector('img[name=icon]').src = `data:${o['icon_mime']};base64,` + o.icon;
+      }
+      else {
+        current.entry.icon = null;
+        delete current.entry['icon_hash'];
+        delete current.entry['icon_mime'];
+        label.querySelector('img[name=icon]').src = '';
+      }
+      self.editor.querySelector('fieldset[name=icons]').textContent = ''; // cleaning
+
+      // Fix groups
+      for (const uuid of commands['remove-groups']) {
+        groups.delete(uuid);
+      }
+
+      if (commands['remove-groups'].length) {
+        for (const label of map.values()) {
+          const {entry} = label.querySelector('input[type=radio]');
+          if (entry.groups.some(uuid => groups.has(uuid) === false)) {
+            entry.groups = entry.groups.filter(uuid => groups.has(uuid));
+            label.querySelector('[name=groups]').textContent = entry.groups.join(', ');
+          }
         }
       }
+
+      // document.dispatchEvent(new Event('sort'));
+      changed();
     }
+    catch (e) {
+      console.error(e);
+      parent.command({
+        cmd: 'notify',
+        type: 'error',
+        message: e.message
+      });
+    }
+    e.submitter.value = 'Done';
+    e.submitter.disabled = false;
 
     self.editor.close();
-
-    // document.dispatchEvent(new Event('sort'));
-    changed();
   };
 
   self.editor.showModal();
+  const icon = self.editor.querySelector('fieldset[name=icons] input[type=radio]:checked');
+  if (icon) {
+    icon.scrollIntoViewIfNeeded();
+  }
 };
 self.editor.querySelector('input[name=close]').onclick = () => self.editor.close();
 self.editor.querySelector('input[name=has-groups]').onchange = e => {
@@ -538,7 +668,11 @@ self.editor.querySelector('input[name=new-icon]').onchange = async e => {
     const buffer = await blob.arrayBuffer();
     const bytes = new Uint8Array(buffer);
     const base64 = btoa(String.fromCharCode(...bytes));
-    const hash = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+
+    const hash = await iconHashFromEntry({
+      'icon': base64,
+      'icon_mime': blob.type
+    });
 
     if (icons.has(hash)) {
       self.editor.querySelector(`input[type=radio][value="${hash}"]`).click();

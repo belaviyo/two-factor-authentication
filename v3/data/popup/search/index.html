@@ -25,7 +25,7 @@ Ctrl + N or Command + N">
   <div id="entries-container">
     <template id="entry">
       <label class="entry">
-        <img name="icon" width="24">
+        <img name="icon" width="24" loading="lazy">
         <span name="name"></span>
         <span name="issuer"></span>
         <span name="groups"></span>
@@ -62,16 +62,19 @@ Ctrl + N or Command + N">
       <div>
         <template id="img">
           <label class="icon">
-            <img width="24">
+            <img width="24" loading="lazy">
             <input type="radio" name="icon">
           </label>
         </template>
         <fieldset name="icons"></fieldset>
-        <label class="button">
-          <input type="file" name="new-icon" accept="image/*">
-          <span>Choose File</span>
-        </label>
-        <input type="button" name="remove-icon" value="Remove">
+        <div name="icon-tools">
+          <label class="button">
+            <input type="file" name="new-icon" accept="image/*">
+            <span>Choose File</span>
+          </label>
+          <input type="button" name="find-icon" value="Best Match">
+          <input type="button" name="remove-icon" value="Remove Icon">
+        </div>
       </div>
       <label>Groups <input type="checkbox" name="has-groups"></label>
       <select name="groups" multiple></select>
@@ -91,6 +94,7 @@ Ctrl + N or Command + N">
   <script src="../storage/core.js"></script>
   <script src="../aegis/scrypt.umd.min.js"></script>
   <script src="otplib.js"></script>
+  <script src="tld.js"></script>
   <script type="module" src="index.mjs"></script>
 </body>
 </html>

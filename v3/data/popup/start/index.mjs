@@ -21,10 +21,10 @@ const save = async handle => {
   // only save if it is a new handle
   const handles = await storage.list('handles');
 
-  for (const {value} of handles) {
+  for (const {value, keypath} of handles) {
     if (await value.isSameEntry(handle)) {
       console.info('handle is already stored');
-      return;
+      return keypath;
     }
   }
 

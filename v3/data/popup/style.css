@@ -39,6 +39,10 @@ textarea,
 input {
   border: solid 1px var(--bd-alt);
 }
+.button {
+  text-align: center;
+}
+.button:disabled,
 button:disabled,
 input[type=submit]:disabled,
 input[type=button]:disabled {

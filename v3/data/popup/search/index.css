@@ -172,27 +172,36 @@ footer {
   fieldset[name=icons] {
     padding: var(--gap);
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     grid-gap: var(--gap);
-    max-height: 3lh;
-    overflow: hidden auto;
+    max-height: 5lh;
+    overflow: auto;
     flex: 1;
     border: solid 1px var(--bd-alt);
+    container-type: inline-size;
 
     &:empty {
       display: none;
     }
 
     img {
-      justify-self: center;
+      place-self: center;
     }
     label {
       border: solid 1px transparent;
       display: grid;
       grid-template-columns: 1fr 0;
+      aspect-ratio: 1 / 1;
     }
     label:has(input:checked) {
       background-color: var(--bg-active);
     }
+  }
+
+  div[name="icon-tools"] {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 14ch;
   }
 }
