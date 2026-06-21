@@ -1,7 +1,7 @@
 {
   "name": "2FA (Two-Factor Authentication)",
   "description": "Portable and Secure Two-Factor Authentication Using the Aegis Local Database",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "manifest_version": 3,
   "offline_enabled": true,
   "homepage_url": "https://webextension.org/listing/2fa.html",
