@@ -1,5 +1,5 @@
-const args = new URLSearchParams(location.search);
-if (args.get('mode') === 'popup') {
+self.args = new URLSearchParams(location.search);
+if (self.args.get('mode') === 'popup') {
   document.body.classList.add('popup');
 }
 

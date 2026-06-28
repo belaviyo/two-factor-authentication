@@ -7,7 +7,8 @@ const once = async () => {
   const prefs = await chrome.storage.local.get({
     'password-on-session': true,
     'handle-on-indexdb': true,
-    'backup-before-save': true
+    'backup-before-save': true,
+    'close-after-copy': true
   });
 
   chrome.contextMenus.create({
@@ -44,24 +45,22 @@ const once = async () => {
     checked: prefs['backup-before-save'],
     parentId: 'settings'
   });
+  chrome.contextMenus.create({
+    contexts: ['action'],
+    type: 'checkbox',
+    title: 'Close the popup after the OTP is copied to the clipboard',
+    id: 'close-after-copy',
+    checked: prefs['close-after-copy'],
+    parentId: 'settings'
+  });
 };
 chrome.runtime.onStartup.addListener(once);
 chrome.runtime.onInstalled.addListener(once);
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'password-on-session') {
+  if ('checked' in info) {
     chrome.storage.local.set({
-      'password-on-session': info.checked
-    });
-  }
-  else if (info.menuItemId === 'handle-on-indexdb') {
-    chrome.storage.local.set({
-      'handle-on-indexdb': info.checked
-    });
-  }
-  else if (info.menuItemId === 'backup-before-save') {
-    chrome.storage.local.set({
-      'backup-before-save': info.checked
+      [info.menuItemId]: info.checked
     });
   }
   else if (info.menuItemId === 'open-in-tab') {

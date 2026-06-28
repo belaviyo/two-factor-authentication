@@ -237,10 +237,20 @@ self.createDB.onclick = async e => {
 
 self.password.oninput = e => {
   const b = e.target.checkValidity();
-  self.openDB.disabled =
-  self.openRemote.disabled =
-  self.createDB.disabled =
-  self.stored.disabled = b === false;
+
+  if (b) {
+    self.openDB.disabled =
+    self.createDB.disabled = typeof FileSystemFileHandle === 'undefined';
+
+    self.openRemote.disabled =
+    self.stored.disabled = b === false;
+  }
+  else {
+    self.openDB.disabled =
+    self.openRemote.disabled =
+    self.createDB.disabled =
+    self.stored.disabled = true;
+  }
 };
 
 chrome.storage.local.get({

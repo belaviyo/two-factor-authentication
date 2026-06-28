@@ -431,6 +431,16 @@ self.progress.addEventListener('animationend', () => {
       e.target.textContent = 'Error';
     }
 
+    const prefs = await chrome.storage.local.get({
+      'close-after-copy': true
+    });
+
+    if (prefs['close-after-copy']) {
+      if (top.args.get('mode') === 'popup') {
+        top.close();
+      }
+    }
+
     id = setTimeout(() => {
       e.target.textContent = 'Copy OTP';
     }, 750);

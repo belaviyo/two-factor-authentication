@@ -1,18 +1,21 @@
-FileSystemFileHandle.prototype.isSameEntry = new Proxy(FileSystemFileHandle.prototype.isSameEntry, {
-  apply(target, self, args) {
-    if (self.kind === 'remote' && args[0].kind !== 'remote') {
-      return false;
-    }
-    if (self.kind !== 'remote' && args[0].kind === 'remote') {
-      return false;
-    }
-    if (self.kind === 'remote' && args[0].kind === 'remote') {
-      return self.href === args[0].href;
-    }
-    return Reflect.apply(target, self, args);
-  }
-});
+/* global FileSystemFileHandle */
 
+if (typeof FileSystemFileHandle !== 'undefined') {
+  FileSystemFileHandle.prototype.isSameEntry = new Proxy(FileSystemFileHandle.prototype.isSameEntry, {
+    apply(target, self, args) {
+      if (self.kind === 'remote' && args[0].kind !== 'remote') {
+        return false;
+      }
+      if (self.kind !== 'remote' && args[0].kind === 'remote') {
+        return false;
+      }
+      if (self.kind === 'remote' && args[0].kind === 'remote') {
+        return self.href === args[0].href;
+      }
+      return Reflect.apply(target, self, args);
+    }
+  });
+}
 
 class Storage {
   #DB_NAME = 'file-storage';
@@ -21,7 +24,14 @@ class Storage {
   static remote(o) {
     o.name = o.href;
 
-    o.isSameEntry = FileSystemFileHandle.prototype.isSameEntry.bind(o);
+    if (typeof FileSystemFileHandle !== 'undefined') {
+      o.isSameEntry = FileSystemFileHandle.prototype.isSameEntry.bind(o);
+    }
+    else {
+      o.isSameEntry = function(other) {
+        return self.href === other.href;
+      };
+    }
 
     o.getFile = async () => {
       const res = await fetch(o.href);
