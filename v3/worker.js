@@ -8,7 +8,8 @@ const once = async () => {
     'password-on-session': true,
     'handle-on-indexdb': true,
     'backup-before-save': true,
-    'close-after-copy': true
+    'close-after-copy': true,
+    'extract-and-search-domain': false
   });
 
   chrome.contextMenus.create({
@@ -53,11 +54,35 @@ const once = async () => {
     checked: prefs['close-after-copy'],
     parentId: 'settings'
   });
+  chrome.contextMenus.create({
+    contexts: ['action'],
+    type: 'checkbox',
+    title: 'Extract domain to search for OTPs',
+    id: 'extract-and-search-domain',
+    checked: prefs['extract-and-search-domain'],
+    parentId: 'settings'
+  });
 };
 chrome.runtime.onStartup.addListener(once);
 chrome.runtime.onInstalled.addListener(once);
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'extract-and-search-domain') {
+    if (info.checked) {
+      const granted = await chrome.permissions.request({
+        permissions: ['activeTab']
+      });
+      if (!granted) {
+        throw Error('USER_ABORT');
+      }
+    }
+    else {
+      await chrome.permissions.remove({
+        permissions: ['activeTab']
+      });
+    }
+  }
+
   if ('checked' in info) {
     chrome.storage.local.set({
       [info.menuItemId]: info.checked

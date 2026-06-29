@@ -186,6 +186,20 @@ const start = async entries => {
       }
     }
   });
+
+  // search active tab
+  try {
+    const tabs = await chrome.tabs.query({active: true, lastFocusedWindow: true});
+    if (tabs.length && tabs[0].url) {
+      const domain = tld.getDomain(tabs[0].url);
+      if (domain) {
+        self.search.value = domain;
+        self.search.select();
+        self.search.dispatchEvent(new Event('input'));
+      }
+    }
+  }
+  catch (e) {}
 };
 
 onmessage = e => {

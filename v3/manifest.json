@@ -9,14 +9,14 @@
     "storage",
     "contextMenus"
   ],
+  "optional_permissions": [
+    "activeTab"
+  ],
   "optional_host_permissions": [
     "*://*/*"
   ],
-  "icons": {
-  },
   "background": {
-    "service_worker": "worker.js",
-    "scripts": ["worker.js"]
+    "service_worker": "worker.js"
   },
   "action": {
     "default_popup": "data/popup/index.html?mode=popup"
