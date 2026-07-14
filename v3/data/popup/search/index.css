@@ -84,7 +84,9 @@ header {
     grid-column: 1 / 1;
   }
   .tools {
-    text-align: end;
+    display: flex;
+    justify-content: flex-end;
+    gap: 5px;
     padding-inline: 10px;
   }
   button {

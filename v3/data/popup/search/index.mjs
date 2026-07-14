@@ -765,71 +765,122 @@ self.delete.onclick = () => {
   changed();
 };
 
+// add entry from otpauth:// URI (shared by text and QR code input)
+const addFromURI = uri => {
+  const url = new URL(uri);
+
+  if (url.protocol !== 'otpauth:') {
+    throw new Error('Invalid OTP URI');
+  }
+
+  // totp / hotp
+  const type = url.host;
+  if (type !== 'totp' && type !== 'hotp') {
+    throw Error('Invalid OTP type');
+  }
+
+  // Label format:
+  // otpauth://totp/Issuer:Account
+  const rawLabel = decodeURIComponent(url.pathname.slice(1));
+
+  let issuerFromLabel = '';
+  let name = rawLabel;
+
+  if (rawLabel.includes(':')) {
+    const parts = rawLabel.split(':');
+    issuerFromLabel = parts.shift().trim();
+    name = parts.join(':').trim();
+  }
+
+  const params = url.searchParams;
+
+
+  const issuer = params.get('issuer') || issuerFromLabel || null;
+
+  const detail = {
+    favorite: false,
+    groups: [],
+    icon: null,
+    info: {
+      secret: params.get('secret') || null,
+      algo: (params.get('algorithm') || 'SHA1').toUpperCase(),
+      digits: Number(params.get('digits') || 6)
+    },
+    issuer,
+    name,
+    note: '',
+    type, // totp | hotp
+    uuid: crypto.randomUUID(),
+    selected: true
+  };
+  if (type === 'totp') {
+    detail.info.period = Number(params.get('period') || 30);
+  }
+  else {
+    detail.info.counter = params.has('counter') ? Number(params.get('counter')) : null;
+  }
+
+  document.dispatchEvent(new CustomEvent('entry', {
+    detail
+  }));
+  changed();
+};
+
 self.new.onclick = () => {
   try {
     const uri = prompt('Enter URI');
     if (!uri) {
       return;
     }
-
-    const url = new URL(uri);
-
-    if (url.protocol !== 'otpauth:') {
-      throw new Error('Invalid OTP URI');
-    }
-
-    // totp / hotp
-    const type = url.host;
-    if (type !== 'totp' && type !== 'hotp') {
-      throw Error('Invalid OTP type');
-    }
-
-    // Label format:
-    // otpauth://totp/Issuer:Account
-    const rawLabel = decodeURIComponent(url.pathname.slice(1));
-
-    let issuerFromLabel = '';
-    let name = rawLabel;
-
-    if (rawLabel.includes(':')) {
-      const parts = rawLabel.split(':');
-      issuerFromLabel = parts.shift().trim();
-      name = parts.join(':').trim();
-    }
-
-    const params = url.searchParams;
-
-    const issuer = params.get('issuer') || issuerFromLabel || null;
-
-    const detail = {
-      favorite: false,
-      groups: [],
-      icon: null,
-      info: {
-        secret: params.get('secret') || null,
-        algo: (params.get('algorithm') || 'SHA1').toUpperCase(),
-        digits: Number(params.get('digits') || 6)
-      },
-      issuer,
-      name,
-      note: '',
-      type, // totp | hotp
-      uuid: crypto.randomUUID(),
-      selected: true
-    };
-    if (type === 'otp') {
-      detail.info.period = Number(params.get('period') || 30);
-    }
-    else {
-      detail.info.counter = params.has('counter') ? Number(params.get('counter')) : null;
-    }
-
-    document.dispatchEvent(new CustomEvent('entry', {
-      detail
-    }));
-    changed();
+    addFromURI(uri);
   }
   catch (e) {
+    console.error(e);
+    parent.command({
+      cmd: 'notify',
+      type: 'error',
+      message: e.message
+    });
+  }
+};
+
+self.qr.onclick = async () => {
+  try {
+    if (typeof BarcodeDetector === 'undefined') {
+      throw Error('QR code detection is not supported in this browser');
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+
+    const file = await new Promise((resolve, reject) => {
+      input.addEventListener('change', () => {
+        if (!input.files?.length) {
+          reject(new DOMException('The user aborted a request.', 'AbortError'));
+          return;
+        }
+        resolve(input.files[0]);
+      });
+      input.click();
+    });
+
+    const bitmap = await createImageBitmap(file);
+    const detector = new BarcodeDetector({
+      formats: ['qr_code']
+    });
+    const results = await detector.detect(bitmap);
+
+    if (!results.length) {
+      throw Error('No QR code detected in the image');
+    }
+
+    addFromURI(results[0].rawValue);
+  }
+  catch (e) {
+    if (e.name === 'AbortError') {
+      return;
+    }
     console.error(e);
     parent.command({
       cmd: 'notify',
