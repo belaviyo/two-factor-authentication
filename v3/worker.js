@@ -1,3 +1,5 @@
+/* global BarcodeDetector */
+
 const once = async () => {
   if (once.done) {
     return;
@@ -9,7 +11,8 @@ const once = async () => {
     'handle-on-indexdb': true,
     'backup-before-save': true,
     'close-after-copy': true,
-    'extract-and-search-domain': false
+    'extract-and-search-domain': false,
+    'add-image-context': true
   });
 
   chrome.contextMenus.create({
@@ -62,6 +65,20 @@ const once = async () => {
     checked: prefs['extract-and-search-domain'],
     parentId: 'settings'
   });
+  chrome.contextMenus.create({
+    contexts: ['action'],
+    type: 'checkbox',
+    title: 'Add OTP by Scanning QR Code Context Menu',
+    id: 'add-image-context',
+    checked: prefs['add-image-context'],
+    parentId: 'settings'
+  });
+  chrome.contextMenus.create({
+    contexts: ['image'],
+    title: 'Add OTP by Scanning QR Code',
+    id: 'scan-qr-code',
+    visible: prefs['add-image-context']
+  });
 };
 chrome.runtime.onStartup.addListener(once);
 chrome.runtime.onInstalled.addListener(once);
@@ -92,6 +109,72 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     chrome.tabs.create({
       url: 'data/popup/index.html',
       index: tab.index + 1
+    });
+  }
+  else if (info.menuItemId === 'scan-qr-code') {
+    try {
+      if (info.srcUrl.startsWith('http')) {
+        const granted = await chrome.permissions.request({
+          origins: [info.srcUrl]
+        });
+        if (!granted) {
+          throw Error('User aborted');
+        }
+      }
+      if (!('BarcodeDetector' in this)) {
+        throw new Error('Barcode Detector API is not supported in this browser.');
+      }
+      const supportedFormats = await BarcodeDetector.getSupportedFormats();
+      if (!supportedFormats.includes('qr_code')) {
+        throw new Error('QR code detection is not supported by this device/browser.');
+      }
+      const qrDetector = new BarcodeDetector({formats: ['qr_code']});
+      const response = await fetch(info.srcUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image. Status: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const img = await createImageBitmap(blob);
+      const barcodes = await qrDetector.detect(img);
+      if (barcodes.length === 0) {
+        throw new Error('No QR code detected in the image.');
+      }
+      const codes = barcodes.map(o => o.rawValue)
+        .filter(s => s.startsWith('otpauth://'))
+        .filter((s, i, l) => s && l.indexOf(s) === i);
+      if (codes.length) {
+        await chrome.action.openPopup();
+        chrome.runtime.sendMessage({
+          method: 'add-otp',
+          codes
+        });
+      }
+      else {
+        throw Error('No valid QR code detected in the image.');
+      }
+    }
+    catch (e) {
+      console.error(e);
+      chrome.action.setBadgeText({
+        text: 'E',
+        tabId: tab.id
+      });
+      chrome.action.setBadgeBackgroundColor({
+        color: 'red',
+        tabId: tab.id
+      });
+      chrome.action.setTitle({
+        title: e.message,
+        tabId: tab.id
+      });
+    }
+  }
+});
+
+chrome.storage.onChanged.addListener(ps => {
+  if ('add-image-context' in ps) {
+    chrome.contextMenus.update('scan-qr-code', {
+      visible: ps['add-image-context'].newValue
     });
   }
 });

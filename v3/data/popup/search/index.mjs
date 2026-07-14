@@ -1,4 +1,4 @@
-/* global otplib, tld */
+/* global otplib, tld, BarcodeDetector */
 
 import {AegisVault} from '../aegis/core.mjs';
 import Fuse from './fuse.min.mjs';
@@ -203,7 +203,7 @@ const start = async entries => {
 };
 
 onmessage = e => {
-  const {database, keypath, password} = e.data;
+  const {database, keypath, password, codes} = e.data;
 
   for (const group of database.groups) {
     groups.set(group.uuid, group.name);
@@ -297,12 +297,31 @@ onmessage = e => {
     database.entries.push(e.detail);
     sorting.perform(database.entries, e.detail.uuid);
   });
+
+  // add new otps
+  for (const code of codes) {
+    try {
+      addFromURI(code);
+      parent.command({
+        cmd: 'notify',
+        type: 'info',
+        message: 'New OTP is added. Make sure to review and save if needed.'
+      });
+    }
+    catch (e) {
+      console.error(e);
+      parent.command({
+        cmd: 'notify',
+        type: 'error',
+        message: e.message
+      });
+    }
+  }
 };
 
 // keyboard support
 onkeydown = e => {
   const meta = e.ctrlKey || e.metaKey;
-
 
   const dlg = document.querySelector('dialog:open');
   if (e.key === 'Escape' && dlg.open) {
