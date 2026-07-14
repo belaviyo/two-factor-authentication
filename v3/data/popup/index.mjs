@@ -7,7 +7,6 @@ const actions = {
   codes: new Set() // add these otps once the search internace is loaded
 };
 self.command = request => {
-  console.log(request);
   if (request.cmd === 'navigate') {
     self.toast.clean();
 
@@ -29,6 +28,7 @@ self.command = request => {
 chrome.runtime.onMessage.addListener(request => {
   if (request.method === 'add-otp') {
     actions.codes.add(...request.codes);
+    self.toast.notify('Unlock to add new OTPs', 'info');
   }
   console.log(actions);
 });

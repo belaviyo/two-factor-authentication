@@ -128,6 +128,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       if (!supportedFormats.includes('qr_code')) {
         throw new Error('QR code detection is not supported by this device/browser.');
       }
+      chrome.action.setBadgeText({
+        text: '...',
+        tabId: tab.id
+      });
       const qrDetector = new BarcodeDetector({formats: ['qr_code']});
       const response = await fetch(info.srcUrl);
       if (!response.ok) {
@@ -152,6 +156,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       else {
         throw Error('No valid QR code detected in the image.');
       }
+      chrome.action.setBadgeText({
+        text: '',
+        tabId: tab.id
+      });
     }
     catch (e) {
       console.error(e);
