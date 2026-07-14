@@ -49,7 +49,7 @@ const once = async () => {
   chrome.contextMenus.create({
     contexts: ['action'],
     type: 'checkbox',
-    title: 'Close the popup after the OTP is copied to the clipboard',
+    title: 'Close Popup after OTP is Copied to the Clipboard',
     id: 'close-after-copy',
     checked: prefs['close-after-copy'],
     parentId: 'settings'
@@ -57,7 +57,7 @@ const once = async () => {
   chrome.contextMenus.create({
     contexts: ['action'],
     type: 'checkbox',
-    title: 'Extract domain to search for OTPs',
+    title: 'Extract Domain to Search for OTPs',
     id: 'extract-and-search-domain',
     checked: prefs['extract-and-search-domain'],
     parentId: 'settings'
