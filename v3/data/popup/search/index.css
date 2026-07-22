@@ -3,6 +3,12 @@ body {
   grid-template-rows: min-content min-content min-content 1fr min-content;
   margin: auto;
   max-width: 800px;
+
+  &:not(.detached) {
+    #send {
+      display: none;
+    }
+  }
 }
 #search-container {
   padding: 10px;

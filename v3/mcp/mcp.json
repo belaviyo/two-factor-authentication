@@ -1,0 +1,77 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "tools": [
+      {
+        "name": "otp_request",
+        "description": "Request a one-time password (OTP) code from the 2FA extension. The extension searches stored OTP accounts using the optional query.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "cmd": {
+              "type": "string",
+              "enum": ["ask-for-otp"],
+              "description": "Must be 'ask-for-otp'"
+            },
+            "query": {
+              "type": "string",
+              "description": "Optional query to search for the OTP account (e.g., 'github', 'google', 'my account')",
+              "optional": true
+            }
+          },
+          "required": [
+            "cmd"
+          ]
+        },
+        "outputSchema": {
+          "type": "array",
+          "description": "Array containing the OTP response or an error object",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "description": "OTP response",
+                "properties": {
+                  "cmd": {
+                    "type": "string",
+                    "enum": ["otp"],
+                    "description": "Command identifier for OTP result"
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "The current one-time password code"
+                  }
+                },
+                "required": [
+                  "cmd",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "description": "Error response if OTP cannot be found",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["error"],
+                    "description": "Indicates this is an error object"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Human-readable error message"
+                  }
+                },
+                "required": [
+                  "type",
+                  "message"
+                ]
+              }
+            ]
+          }
+        }
+      }
+
+    ]
+  }
+}

@@ -187,6 +187,54 @@ chrome.storage.onChanged.addListener(ps => {
   }
 });
 
+/* cross-extension MCP support */
+chrome.runtime.onMessageExternal.addListener((request, sender, response) => {
+  if (request.cmd === 'mcp.json') {
+    fetch('mcp/mcp.json').then(r => r.json()).then(response);
+    return true;
+  }
+  else if (request.cmd === 'mcp.output') {
+    fetch('mcp/mcp.output').then(r => r.text()).then(response);
+    return true;
+  }
+});
+
+/* external access */
+chrome.runtime.onConnectExternal.addListener(eport => {
+  eport.onMessage.addListener(async request => {
+    if (request.cmd === 'ask-for-otp') {
+      const args = new URLSearchParams();
+      args.set('mode', 'detached');
+      if (request.query) {
+        args.set('query', request.query);
+      }
+      if (eport.sender.id) {
+        args.set('title', 'OTP request by "' + eport.sender.id + '" :: 2FA');
+      }
+      const observe = iport => {
+        iport.onDisconnect.addListener(() => {
+          eport.disconnect();
+        });
+        iport.onMessage.addListener(request => eport.postMessage(request));
+        chrome.runtime.onConnect.removeListener(observe);
+      };
+      chrome.runtime.onConnect.addListener(observe);
+      const win = await chrome.windows.create({
+        url: '/data/popup/index.html?' + args.toString(),
+        width: 600,
+        height: 800,
+        type: 'popup'
+      });
+      eport.onDisconnect.addListener(() => {
+        chrome.windows.remove(win.id).catch(() => {});
+      });
+      setTimeout(() => {
+        chrome.runtime.onConnect.removeListener(observe);
+      }, 5000);
+    }
+  });
+});
+
 /* FAQs & Feedback */
 {
   const {management, runtime: {onInstalled, setUninstallURL, getManifest}, storage, tabs} = chrome;

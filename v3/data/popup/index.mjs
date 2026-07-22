@@ -30,5 +30,4 @@ chrome.runtime.onMessage.addListener(request => {
     actions.codes.add(...request.codes);
     self.toast.notify('Unlock to add new OTPs', 'info');
   }
-  console.log(actions);
 });

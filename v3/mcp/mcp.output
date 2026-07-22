@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": [
+    { "cmd": "otp", "value": "257604" },
+    { "type": "error", "message": "Unknown Error" }
+  ]
+}

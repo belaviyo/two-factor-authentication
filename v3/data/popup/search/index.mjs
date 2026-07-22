@@ -3,6 +3,11 @@
 import {AegisVault} from '../aegis/core.mjs';
 import Fuse from './fuse.min.mjs';
 
+if (top.args.get('mode') === 'detached') {
+  document.body.classList.add('detached');
+}
+console.log(top.args.get('mode'));
+
 const groups = new Map();
 const icons = new Map();
 const map = new Map();
@@ -188,18 +193,27 @@ const start = async entries => {
   });
 
   // search active tab
-  try {
-    const tabs = await chrome.tabs.query({active: true, lastFocusedWindow: true});
-    if (tabs.length && tabs[0].url) {
-      const domain = tld.getDomain(tabs[0].url);
-      if (domain) {
-        self.search.value = domain;
-        self.search.select();
-        self.search.dispatchEvent(new Event('input'));
-      }
+  if (top.args.get('mode') === 'detached') {
+    if (top.args.has('query')) {
+      self.search.value = top.args.get('query');
+      self.search.select();
+      self.search.dispatchEvent(new Event('input'));
     }
   }
-  catch (e) {}
+  else {
+    try {
+      const tabs = await chrome.tabs.query({active: true, lastFocusedWindow: true});
+      if (tabs.length && tabs[0].url) {
+        const domain = tld.getDomain(tabs[0].url);
+        if (domain) {
+          self.search.value = domain;
+          self.search.select();
+          self.search.dispatchEvent(new Event('input'));
+        }
+      }
+    }
+    catch (e) {}
+  }
 };
 
 onmessage = e => {
@@ -382,6 +396,7 @@ const generate = entry => {
 
     generate.run();
     self.copy.disabled = false;
+    self.send.disabled = Boolean(top.port) === false;
     self.edit.disabled = false;
     self.delete.disabled = false;
   }
@@ -424,6 +439,7 @@ generate.run = async () => {
 generate.stop = () => {
   self.progress.classList.remove('progress');
   self.copy.disabled = true;
+  self.send.disabled = true;
   self.edit.disabled = true;
   self.delete.disabled = true;
   delete current.entry;
@@ -479,6 +495,15 @@ self.progress.addEventListener('animationend', () => {
     }, 750);
   };
 }
+
+// send
+self.send.onclick = async () => {
+  await top.port.postMessage({
+    cmd: 'otp',
+    value: generate.token
+  });
+  top.close();
+};
 
 // edit
 const commands = {
