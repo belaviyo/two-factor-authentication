@@ -6,7 +6,6 @@ import Fuse from './fuse.min.mjs';
 if (top.args.get('mode') === 'detached') {
   document.body.classList.add('detached');
 }
-console.log(top.args.get('mode'));
 
 const groups = new Map();
 const icons = new Map();

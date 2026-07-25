@@ -187,6 +187,25 @@ chrome.storage.onChanged.addListener(ps => {
   }
 });
 
+chrome.runtime.onMessage.addListener(request => {
+  // Use KeePassHelper to get password
+  if (request.cmd === 'kph-get-password') {
+    const port = chrome.runtime.connect(request.prefs['keepasshelper-id']);
+    port.onMessage.addListener(async response => {
+      if (response.cmd === 'insert.password') {
+        await chrome.storage.session.set({
+          'password': response.value
+        });
+        chrome.action.openPopup();
+      }
+    });
+    port.postMessage({
+      cmd: 'ask-for-credential',
+      href: request.prefs['keepasshelper-query']
+    });
+  }
+});
+
 /* cross-extension MCP support */
 chrome.runtime.onMessageExternal.addListener((request, sender, response) => {
   if (request.cmd === 'mcp.json') {
@@ -196,6 +215,11 @@ chrome.runtime.onMessageExternal.addListener((request, sender, response) => {
   else if (request.cmd === 'mcp.output') {
     fetch('mcp/mcp.output').then(r => r.text()).then(response);
     return true;
+  }
+  else {
+    response({
+      error: 'unknown-request'
+    });
   }
 });
 

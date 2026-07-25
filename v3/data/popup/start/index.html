@@ -10,7 +10,10 @@
   <h1>2FA (Two-Factor Authentication)</h1>
   <form id="content">
     <span>Enter</span>
-    <input type="password" id="password" placeholder="Password" minlength="4" required autofocus title="min password length is 4 chars">
+    <div class="two">
+      <input type="password" id="password" placeholder="Password" minlength="4" required autofocus title="min password length is 4 chars">
+      <input type="button" id="keepasshelper" accesskey="k" title="Use (K)eePassHelper extension to get the Password">
+    </div>
     <span>to</span>
     <button type="submit" id="openDB" accesskey="o" disabled><u>O</u>pen a Database</button>
     <button type="button" id="openRemote" accesskey="m" disabled>Open <u>R</u>emote</button>

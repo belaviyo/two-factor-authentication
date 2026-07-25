@@ -45,3 +45,19 @@ body {
 footer {
   text-align: end;
 }
+
+.two {
+  display: grid;
+  grid-template-columns: 1fr 0;
+  width: 100%;
+  overflow: hidden;
+
+  #keepasshelper {
+    background: url('keepasshelper.png') no-repeat center center;
+    background-size: 16px;
+  }
+
+  &.available {
+    grid-template-columns: 1fr 32px;
+  }
+}

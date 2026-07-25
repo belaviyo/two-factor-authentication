@@ -392,3 +392,34 @@ onkeydown = e => {
     return;
   }
 };
+
+// KeePassHelper
+{
+  const ua = navigator.userAgent.toLowerCase();
+  let id = 'jgnfghanfbjmimbdmnjfofnbcgpkbegj';
+
+  if (ua.includes('firefox')) {
+    id = '{69ef9498-0139-43e4-97b8-942982ac9158}';
+  }
+  else if (ua.includes('edg')) {
+    id = 'bfmglfdehkodoiinbclgoppembjfgjkj';
+  }
+  chrome.storage.local.get({
+    'keepasshelper-id': id,
+    'keepasshelper-query': 'aegis'
+  }).then(async prefs => {
+    try {
+      await chrome.runtime.sendMessage(id, {
+        cmd: 'not-a-command'
+      });
+      document.querySelector('.two').classList.add('available');
+      self.keepasshelper.onclick = () => chrome.runtime.sendMessage({
+        cmd: 'kph-get-password',
+        prefs
+      });
+    }
+    catch (e) {
+      console.error(e);
+    }
+  });
+}
