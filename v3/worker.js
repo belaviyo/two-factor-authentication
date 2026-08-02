@@ -235,11 +235,15 @@ chrome.runtime.onConnectExternal.addListener(eport => {
       if (eport.sender.id) {
         args.set('title', 'OTP request by "' + eport.sender.id + '" :: 2FA');
       }
+      const msgs = [];
       const observe = iport => {
         iport.onDisconnect.addListener(() => {
+          if (!request.stream && msgs.length) {
+            eport.postMessage(msgs);
+          }
           eport.disconnect();
         });
-        iport.onMessage.addListener(request => eport.postMessage(request));
+        iport.onMessage.addListener(msg => request.stream ? eport.postMessage(msg) : msgs.push(msg));
         chrome.runtime.onConnect.removeListener(observe);
       };
       chrome.runtime.onConnect.addListener(observe);
