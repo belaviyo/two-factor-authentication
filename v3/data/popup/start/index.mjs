@@ -1,4 +1,5 @@
 import {AegisVault} from '../aegis/core.mjs';
+import {prompt} from '../prompt.mjs';
 
 const open = async (database, keypath) => {
   if (keypath) {
@@ -105,7 +106,7 @@ self.openRemote.onclick = async e => {
     });
 
     e.target.value = 'Select Source...';
-    const href = prompt('Select remote source', prefs['last-remote-source']);
+    const href = await prompt('Select remote source', prefs['last-remote-source']);
     if (!href) {
       throw Error('User Aborted');
     }
@@ -188,7 +189,8 @@ self.createDB.onclick = async e => {
       'handle-on-indexdb': true
     });
 
-    const cp = prompt('Re-enter the password');
+    const cp = await prompt('Re-enter the password', '', {password: true});
+    console.log(cp);
     if (cp !== self.password.value) {
       throw Error('Passwords do not match');
     }

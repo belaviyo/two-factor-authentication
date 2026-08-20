@@ -1,6 +1,7 @@
 /* global otplib, tld, BarcodeDetector */
 
 import {AegisVault} from '../aegis/core.mjs';
+import {prompt} from '../prompt.mjs';
 import Fuse from './fuse.min.mjs';
 
 if (top.args.get('mode') === 'detached') {
@@ -694,8 +695,8 @@ self.editor.querySelector('select[name=groups]').onchange = e => {
     self.editor.querySelector('input[name=delete-groups]').disabled = false;
   }
 };
-self.editor.querySelector('input[name=add-a-group]').onclick = () => {
-  const name = prompt('Group Name:');
+self.editor.querySelector('input[name=add-a-group]').onclick = async () => {
+  const name = await prompt('Group Name:');
   if (name) {
     for (const n of groups.values()) {
       if (n === name) {
@@ -869,9 +870,9 @@ const addFromURI = uri => {
   changed();
 };
 
-self.new.onclick = () => {
+self.new.onclick = async () => {
   try {
-    const uri = prompt('Enter URI');
+    const uri = await prompt('Enter URI');
     if (!uri) {
       return;
     }
