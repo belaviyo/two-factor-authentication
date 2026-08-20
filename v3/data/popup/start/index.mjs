@@ -166,6 +166,10 @@ self.createDB.onclick = async e => {
     e.target.disabled = true;
     e.target.value = 'Select File...';
 
+    if (self.password.value.length < 4) {
+      throw Error('Password is too short!');
+    }
+
     const handle = await window.showSaveFilePicker({
       suggestedName: 'vault.json',
       types: [
