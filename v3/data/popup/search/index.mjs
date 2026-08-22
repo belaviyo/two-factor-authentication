@@ -121,7 +121,10 @@ const start = async entries => {
   // search
   const fuse = new Fuse(entries, {
     keys: ['name', 'issuer', 'groups'],
-    useTokenSearch: true
+    useTokenSearch: true,
+    threshold: 0.1,
+    includeScore: true,
+    includeMatches: true
   });
   const reset = () => {
     for (const label of map.values()) {
