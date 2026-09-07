@@ -191,12 +191,18 @@ chrome.runtime.onMessage.addListener(request => {
   // Use KeePassHelper to get password
   if (request.cmd === 'kph-get-password') {
     const port = chrome.runtime.connect(request.prefs['keepasshelper-id']);
-    port.onMessage.addListener(async response => {
-      if (response.cmd === 'insert.password') {
-        await chrome.storage.session.set({
-          'password': response.value
-        });
-        chrome.action.openPopup();
+    port.onMessage.addListener(async responses => {
+      if (Array.isArray(responses) === false) {
+        responses = [responses];
+      }
+      for (const {cmd, value} of responses) {
+        if (cmd === 'insert.password') {
+          await chrome.storage.session.set({
+            'password': value
+          });
+          chrome.action.openPopup();
+          break;
+        }
       }
     });
     port.postMessage({
