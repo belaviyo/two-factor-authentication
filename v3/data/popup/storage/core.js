@@ -117,8 +117,12 @@ class Storage {
       // Store the file with its data
       const fileStore = transaction.objectStore(storage);
       const request = fileStore.add(value);
+      // force an early commit
+      transaction.commit?.();
 
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => {};
+      // resolve only when the data is durably committed
+      transaction.oncomplete = () => resolve(request.result);
 
       request.onerror = e => reject(Error(e.target.error));
       transaction.onerror = e => reject(Error(e.target.error));
@@ -154,8 +158,12 @@ class Storage {
       const store = transaction.objectStore(storage);
 
       const request = store.delete(keypath);
+      // force an early commit
+      transaction.commit?.();
 
-      request.onsuccess = () => resolve();
+      // resolve only when the data is durably committed
+      transaction.oncomplete = () => resolve();
+
       request.onerror = e => reject(Error(e.target.error));
       transaction.onerror = e => reject(Error(e.target.error));
     });
