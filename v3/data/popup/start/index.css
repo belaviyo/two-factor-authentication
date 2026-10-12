@@ -46,6 +46,11 @@ footer {
   text-align: end;
 }
 
+button.flow-highlight {
+  outline: 2px solid var(--bg-active);
+  box-shadow: 0 0 5px var(--bg-active);
+}
+
 .two {
   display: grid;
   grid-template-columns: 1fr 0;

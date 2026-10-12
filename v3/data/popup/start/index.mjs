@@ -1,5 +1,19 @@
 import {AegisVault} from '../aegis/core.mjs';
-import {prompt} from '../prompt.mjs';
+import {confirm, prompt} from '../prompt.mjs';
+
+const inPopup = new URLSearchParams(location.search).get('mode') === 'popup';
+
+/* hand the current state over to a regular browser tab */
+const switchToTab = async flow => {
+  await chrome.storage.session.set({
+    'tab-password': self.password.value,
+    'tab-flow': flow
+  });
+  chrome.tabs.create({
+    url: 'data/popup/index.html'
+  });
+  window.close();
+};
 
 const open = async (database, keypath) => {
   if (keypath) {
@@ -37,6 +51,20 @@ self.openDB.onclick = async e => {
 
   try {
     e.target.disabled = true;
+
+    if (inPopup) {
+      const action = await confirm(
+        'Open the file picker in this popup or switch to a browser tab?',
+        'File pickers are unreliable in this popup. Switching to a browser tab keeps your password.'
+      );
+      if (action === 'tab') {
+        return await switchToTab('openDB');
+      }
+      if (!action) {
+        e.target.disabled = false;
+        return;
+      }
+    }
 
     const prefs = await chrome.storage.local.get({
       'password-on-session': true,
@@ -169,6 +197,21 @@ self.createDB.onclick = async e => {
 
     if (self.password.value.length < 4) {
       throw Error('Password is too short!');
+    }
+
+    if (inPopup) {
+      const action = await confirm(
+        'Open the file picker in this popup or switch to a browser tab?',
+        'File pickers are unreliable in this popup. Switching to a browser tab keeps your password.'
+      );
+      if (action === 'tab') {
+        return await switchToTab('createDB');
+      }
+      if (!action) {
+        e.target.disabled = false;
+        e.target.value = 'Create a new Database';
+        return;
+      }
     }
 
     const handle = await window.showSaveFilePicker({
@@ -352,10 +395,32 @@ self.reset.onclick = () => {
   };
 };
 
-// restore password
-chrome.storage.local.get({
-  'handle-on-indexdb': true
-}).then(prefs => {
+// restore password or accept the one handed over from the popup
+(async () => {
+  const args = new URLSearchParams(location.search);
+
+  if (!args.get('mode')) {
+    const handoff = await chrome.storage.session.get({
+      'tab-password': '',
+      'tab-flow': ''
+    });
+    if (handoff['tab-password']) {
+      chrome.storage.session.remove(['tab-password', 'tab-flow']);
+      self.password.value = handoff['tab-password'];
+      self.password.dispatchEvent(new Event('input'));
+      if (handoff['tab-flow'] === 'createDB') {
+        self.createDB.classList.add('flow-highlight');
+      }
+      else {
+        self.openDB.classList.add('flow-highlight');
+      }
+      return;
+    }
+  }
+
+  const prefs = await chrome.storage.local.get({
+    'handle-on-indexdb': true
+  });
   if (prefs['handle-on-indexdb']) {
     chrome.storage.session.get({
       'password': ''
@@ -366,7 +431,7 @@ chrome.storage.local.get({
       }
     });
   }
-});
+})();
 
 self.last.onclick = e => {
   e.preventDefault();

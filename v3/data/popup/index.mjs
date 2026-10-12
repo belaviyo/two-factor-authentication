@@ -3,6 +3,16 @@ if (self.args.get('mode') === 'popup') {
   document.body.classList.add('popup');
 }
 
+/* pass the current mode to the embedded start page */
+{
+  const frame = document.getElementById('app-frame');
+  const params = new URLSearchParams();
+  if (self.args.get('mode')) {
+    params.set('mode', self.args.get('mode'));
+  }
+  frame.src = 'start/index.html' + (params.size ? '?' + params.toString() : '');
+}
+
 const actions = {
   codes: new Set() // add these otps once the search internace is loaded
 };
