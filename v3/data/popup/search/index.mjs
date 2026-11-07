@@ -476,6 +476,11 @@ self.progress.addEventListener('animationend', () => {
     clearTimeout(id);
     try {
       await navigator.clipboard.writeText(generate.token);
+      if (current.entry?.type === 'hotp') {
+        current.entry.info.counter = (Number(current.entry.info.counter) || 0) + 1;
+        changed();
+        await generate.run();
+      }
       e.target.textContent = 'Done';
     }
     catch (e) {
@@ -505,6 +510,11 @@ self.send.onclick = async () => {
     cmd: 'otp',
     value: generate.token
   });
+  if (current.entry?.type === 'hotp') {
+    current.entry.info.counter = (Number(current.entry.info.counter) || 0) + 1;
+    changed();
+    await generate.run();
+  }
   top.close();
 };
 
