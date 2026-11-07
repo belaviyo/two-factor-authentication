@@ -17,6 +17,38 @@ if (typeof FileSystemFileHandle !== 'undefined') {
   });
 }
 
+const MAX_REMOTE_FILE_SIZE = 10 * 1024 * 1024; // 10 MiB
+
+// Strip credentials/tokens (query, fragment, userinfo) before persisting
+// a remote URL, so signed URLs are not leaked via chrome.storage.local
+// or the IndexedDB handle store. The live in-memory handle keeps the
+// original URL for the current session.
+function sanitizeRemoteHref(href) {
+  try {
+    const u = new URL(href);
+    u.search = '';
+    u.hash = '';
+    u.username = '';
+    u.password = '';
+    return u.toString();
+  }
+  catch {
+    return href;
+  }
+}
+
+// Match the File System Access API contract: mode defaults to 'read'
+// and must be 'read' or 'readwrite'. Chrome host permissions have no
+// read/readwrite granularity, so mode is validated for compatibility
+// but does not affect the underlying chrome.permissions call; a
+// readwrite failure is surfaced by the server rejecting the POST.
+function checkPermissionMode({mode = 'read'} = {}) {
+  if (!['read', 'readwrite'].includes(mode)) {
+    throw new TypeError(`Invalid permission mode: ${mode}`);
+  }
+  return mode;
+}
+
 class Storage {
   #DB_NAME = 'file-storage';
   #db;
@@ -35,17 +67,36 @@ class Storage {
 
     o.getFile = async () => {
       const res = await fetch(o.href);
-      const blob = await res.blob();
 
-      if (blob.type.includes('/json') === false) {
-        throw Error('Remote is not JSON');
+      if (!res.ok) {
+        throw Error('Failed to fetch remote vault: ' + res.status + ' ' + res.statusText);
       }
 
-      return new File([blob], this.name, {type: blob.type});
+      const length = Number(res.headers.get('content-length'));
+      if (Number.isFinite(length) && length > MAX_REMOTE_FILE_SIZE) {
+        throw Error('Remote vault is too large: ' + length + ' bytes');
+      }
+
+      const blob = await res.blob();
+
+      if (blob.size > MAX_REMOTE_FILE_SIZE) {
+        throw Error('Remote vault is too large: ' + blob.size + ' bytes');
+      }
+
+      // Do not rely on blob.type: many servers serve JSON as
+      // text/plain, application/octet-stream, or with no type.
+      // Callers parse with Response.json(), which rejects non-JSON.
+      return new File([blob], o.name, {type: blob.type});
     };
 
     o.createWritable = async () => {
-      let buffer = await (await fetch(o.href)).blob();
+      const res = await fetch(o.href);
+
+      if (!res.ok) {
+        throw Error('Failed to fetch remote vault: ' + res.status + ' ' + res.statusText);
+      }
+
+      let buffer = await res.blob();
 
       return {
         write(data) {
@@ -68,9 +119,23 @@ class Storage {
         }
       };
     };
-    o.queryPermission = () => chrome.permissions.request({
-      origins: [o.href]
-    }).then(b => b ? 'granted' : 'denied');
+    // Side-effect-free check, matching FileSystemHandle.queryPermission.
+    // chrome.permissions.contains() cannot distinguish "never asked"
+    // from "denied", so a missing grant is reported as 'prompt' to
+    // trigger the caller's requestPermission() fallback.
+    o.queryPermission = async (options = {}) => {
+      checkPermissionMode(options);
+      return (await chrome.permissions.contains({
+        origins: [o.href]
+      })) ? 'granted' : 'prompt';
+    };
+    // Prompting counterpart, matching FileSystemHandle.requestPermission.
+    o.requestPermission = async (options = {}) => {
+      checkPermissionMode(options);
+      return (await chrome.permissions.request({
+        origins: [o.href]
+      })) ? 'granted' : 'denied';
+    };
     return o;
   }
 
@@ -107,7 +172,7 @@ class Storage {
     if (value.kind === 'remote') {
       value = {
         kind: 'remote',
-        href: value.href
+        href: sanitizeRemoteHref(value.href)
       };
     }
 

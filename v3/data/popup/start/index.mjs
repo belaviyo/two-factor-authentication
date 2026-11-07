@@ -145,6 +145,15 @@ self.openRemote.onclick = async e => {
       'last-remote-source': ''
     });
 
+    // scrub tokens persisted by older versions
+    if (prefs['last-remote-source']) {
+      const clean = sanitizeRemoteHref(prefs['last-remote-source']);
+      if (clean !== prefs['last-remote-source']) {
+        chrome.storage.local.set({'last-remote-source': clean});
+        prefs['last-remote-source'] = clean;
+      }
+    }
+
     e.target.value = 'Select Source...';
     const href = await prompt('Select remote source', prefs['last-remote-source']);
     if (!href) {
@@ -156,7 +165,9 @@ self.openRemote.onclick = async e => {
     });
 
     if ((await handle.queryPermission({mode: 'read'})) !== 'granted') {
-      throw Error('Permission Denied');
+      if ((await handle.requestPermission({mode: 'read'})) !== 'granted') {
+        throw Error('Permission Denied');
+      }
     }
 
     const file = await handle.getFile();
@@ -173,9 +184,9 @@ self.openRemote.onclick = async e => {
         'password': self.password.value
       });
     }
-    // store remote
+    // store sanitized remote (no query/fragment tokens), keep href in-memory only
     chrome.storage.local.set({
-      'last-remote-source': href
+      'last-remote-source': sanitizeRemoteHref(href)
     });
 
     // store handle
