@@ -225,7 +225,17 @@ const start = async entries => {
 };
 
 onmessage = e => {
-  if (e.data?.cmd === 'change-password') {
+  // accept handoff data only from the parent extension page;
+  // extension-origin checks are unreliable across Chrome/Firefox
+  if (e.source !== window.parent) {
+    return;
+  }
+
+  if (!e.data || typeof e.data !== 'object') {
+    return;
+  }
+
+  if (e.data.cmd === 'change-password') {
     self.changePassword.click();
     return;
   }

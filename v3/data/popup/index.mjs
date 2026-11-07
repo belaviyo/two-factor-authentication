@@ -25,7 +25,7 @@ self.command = request => {
       if (request.href.startsWith('search/index.html')) {
         request.data.codes = actions.codes;
       }
-      iframe.contentWindow.postMessage(request.data, '*');
+      iframe.contentWindow.postMessage(request.data, window.location.origin);
     };
     iframe.src = request.href;
   }
@@ -37,7 +37,7 @@ self.command = request => {
 self.toast.addEventListener('notify-action', e => {
   if (e.detail?.action === 'change-password') {
     const iframe = document.getElementById('app-frame');
-    iframe.contentWindow.postMessage({cmd: 'change-password'}, '*');
+    iframe.contentWindow.postMessage({cmd: 'change-password'}, window.location.origin);
   }
 });
 
