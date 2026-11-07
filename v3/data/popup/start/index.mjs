@@ -1,5 +1,16 @@
-import {AegisVault} from '../aegis/core.mjs';
+import {AegisVault, InvalidVaultError, VaultUnlockError} from '../aegis/core.mjs';
 import {confirm, prompt} from '../prompt.mjs';
+
+const vaultErrorMessage = e => {
+  // GCM cannot distinguish a wrong password from a corrupted vault
+  if (e instanceof VaultUnlockError || e?.name === 'OperationError') {
+    return 'Wrong password or corrupted vault';
+  }
+  if (e instanceof InvalidVaultError) {
+    return e.message;
+  }
+  return e?.message || 'Failed to open vault. Try again...';
+};
 
 const inPopup = new URLSearchParams(location.search).get('mode') === 'popup';
 
@@ -114,7 +125,7 @@ self.openDB.onclick = async e => {
     parent.command({
       cmd: 'notify',
       type: 'error',
-      message: e.message || 'Wrong password. Try again...'
+      message: vaultErrorMessage(e)
     });
     self.password.focus();
   }
@@ -181,7 +192,7 @@ self.openRemote.onclick = async e => {
     parent.command({
       cmd: 'notify',
       type: 'error',
-      message: e.message || 'Wrong password. Try again...'
+      message: vaultErrorMessage(e)
     });
     self.password.focus();
   }
@@ -277,7 +288,7 @@ self.createDB.onclick = async e => {
     parent.command({
       cmd: 'notify',
       type: 'error',
-      message: e.message || 'Wrong password. Try again...'
+      message: vaultErrorMessage(e)
     });
     self.password.focus();
   }
@@ -372,7 +383,7 @@ self.stored.onchange = async e => {
       parent.command({
         cmd: 'notify',
         type: 'error',
-        message: e.message || 'Wrong password. Try again...'
+        message: vaultErrorMessage(e)
       });
       self.password.focus();
       self.stored.selectedIndex = 0;

@@ -12,10 +12,32 @@ export function bytesToBase64(bytes) {
   return btoa(bin);
 }
 
+export class InvalidVaultError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'InvalidVaultError';
+    this.code = 'invalid-vault';
+  }
+}
+
+export class VaultUnlockError extends Error {
+  constructor(message = 'Wrong password or corrupted vault') {
+    super(message);
+    this.name = 'VaultUnlockError';
+    this.code = 'wrong-password-or-corrupted';
+  }
+}
+
 export class AegisVault {
   constructor(vaultJson) {
-    this.vault =
-      typeof vaultJson === 'string' ? JSON.parse(vaultJson) : vaultJson;
+    try {
+      this.vault =
+        typeof vaultJson === 'string' ? JSON.parse(vaultJson) : vaultJson;
+    }
+    catch (e) {
+      throw new InvalidVaultError(`Vault is not valid JSON: ${e.message}`);
+    }
+    this.#validateVault();
   }
 
   static async create(password) {
@@ -193,19 +215,7 @@ export class AegisVault {
   // =====================================================
 
   async decrypt(password) {
-    const slot = this.#getPasswordSlot();
-
-    const derivedKey = await this.#deriveKey(
-      password,
-      this.#hexToBytes(slot.salt)
-    );
-
-    const masterKey = await this.#aesDecrypt({
-      key: derivedKey,
-      nonce: this.#hexToBytes(slot.key_params.nonce),
-      tag: this.#hexToBytes(slot.key_params.tag),
-      data: this.#hexToBytes(slot.key)
-    });
+    const {masterKey} = await this.#unlockMasterKey(password);
 
     const dbBytes = await this.#aesDecrypt({
       key: masterKey,
@@ -218,19 +228,7 @@ export class AegisVault {
   }
 
   async encrypt(password, databaseObject) {
-    const slot = this.#getPasswordSlot();
-
-    const derivedKey = await this.#deriveKey(
-      password,
-      this.#hexToBytes(slot.salt)
-    );
-
-    const masterKey = await this.#aesDecrypt({
-      key: derivedKey,
-      nonce: this.#hexToBytes(slot.key_params.nonce),
-      tag: this.#hexToBytes(slot.key_params.tag),
-      data: this.#hexToBytes(slot.key)
-    });
+    const {masterKey} = await this.#unlockMasterKey(password);
 
     const plain = new TextEncoder().encode(
       JSON.stringify(databaseObject)
@@ -252,19 +250,7 @@ export class AegisVault {
   }
 
   async changePassword(oldPassword, newPassword) {
-    const slot = this.#getPasswordSlot();
-
-    const oldDerivedKey = await this.#deriveKey(
-      oldPassword,
-      this.#hexToBytes(slot.salt)
-    );
-
-    const masterKey = await this.#aesDecrypt({
-      key: oldDerivedKey,
-      nonce: this.#hexToBytes(slot.key_params.nonce),
-      tag: this.#hexToBytes(slot.key_params.tag),
-      data: this.#hexToBytes(slot.key)
-    });
+    const {masterKey, slot} = await this.#unlockMasterKey(oldPassword);
 
     const salt = crypto.getRandomValues(new Uint8Array(32));
 
@@ -321,15 +307,25 @@ export class AegisVault {
     combined.set(data, 0);
     combined.set(tag, data.length);
 
-    const result = await crypto.subtle.decrypt(
-      {
-        name: 'AES-GCM',
-        iv: nonce,
-        tagLength: 128
-      },
-      cryptoKey,
-      combined
-    );
+    let result;
+    try {
+      result = await crypto.subtle.decrypt(
+        {
+          name: 'AES-GCM',
+          iv: nonce,
+          tagLength: 128
+        },
+        cryptoKey,
+        combined
+      );
+    }
+    catch (e) {
+      // GCM cannot distinguish a wrong key from corrupted data
+      if (e?.name === 'OperationError') {
+        throw new VaultUnlockError('Wrong password or corrupted vault');
+      }
+      throw e;
+    }
 
     return new Uint8Array(result);
   }
@@ -368,16 +364,121 @@ export class AegisVault {
     return {nonce, ciphertext, tag};
   }
 
-  #getPasswordSlot() {
-    const slot = this.vault.header.slots.find(
+  #getPasswordSlots() {
+    return this.vault.header.slots.filter(
       s => s.type === 1
     );
+  }
 
-    if (!slot) {
-      throw new Error('No password slot found');
+  // Try every password slot in order. All slots wrap the same master
+  // key, so any slot that decrypts successfully is sufficient.
+  async #unlockMasterKey(password) {
+    for (const slot of this.#getPasswordSlots()) {
+      const derivedKey = await this.#deriveKey(
+        password,
+        this.#hexToBytes(slot.salt)
+      );
+
+      try {
+        const masterKey = await this.#aesDecrypt({
+          key: derivedKey,
+          nonce: this.#hexToBytes(slot.key_params.nonce),
+          tag: this.#hexToBytes(slot.key_params.tag),
+          data: this.#hexToBytes(slot.key)
+        });
+
+        return {masterKey, slot};
+      }
+      catch (e) {
+        if (e instanceof VaultUnlockError) {
+          continue;
+        }
+        throw e;
+      }
     }
 
-    return slot;
+    throw new VaultUnlockError('Wrong password or corrupted vault');
+  }
+
+  #assertHex(label, value, length) {
+    if (
+      typeof value !== 'string' ||
+      value.length !== length ||
+      !/^[0-9a-fA-F]+$/.test(value)
+    ) {
+      throw new InvalidVaultError(
+        `Invalid vault: ${label} must be ${length} hex characters`
+      );
+    }
+  }
+
+  #validateVault() {
+    const vault = this.vault;
+
+    if (!vault || typeof vault !== 'object') {
+      throw new InvalidVaultError('Invalid vault: expected an object');
+    }
+
+    if (vault.version !== 1) {
+      throw new InvalidVaultError(
+        `Unsupported vault version: ${vault.version}`
+      );
+    }
+
+    const header = vault.header;
+    if (!header || typeof header !== 'object') {
+      throw new InvalidVaultError('Invalid vault: missing header');
+    }
+
+    if (!Array.isArray(header.slots) || header.slots.length === 0) {
+      throw new InvalidVaultError('Invalid vault: missing header.slots');
+    }
+
+    const params = header.params;
+    if (!params || typeof params !== 'object') {
+      throw new InvalidVaultError('Invalid vault: missing header.params');
+    }
+    this.#assertHex('header.params.nonce', params.nonce, 24);
+    this.#assertHex('header.params.tag', params.tag, 32);
+
+    for (const slot of header.slots) {
+      if (!slot || typeof slot !== 'object') {
+        throw new InvalidVaultError('Invalid vault: malformed slot');
+      }
+      // only password slots are tried; other slot types have a
+      // different shape and are ignored
+      if (slot.type !== 1) {
+        continue;
+      }
+      this.#assertHex('slot.salt', slot.salt, 64);
+      this.#assertHex('slot.key', slot.key, 64);
+      const keyParams = slot.key_params;
+      if (!keyParams || typeof keyParams !== 'object') {
+        throw new InvalidVaultError('Invalid vault: missing slot.key_params');
+      }
+      this.#assertHex('slot.key_params.nonce', keyParams.nonce, 24);
+      this.#assertHex('slot.key_params.tag', keyParams.tag, 32);
+    }
+
+    if (this.#getPasswordSlots().length === 0) {
+      throw new InvalidVaultError('No password slot found');
+    }
+
+    if (
+      typeof vault.db !== 'string' ||
+      vault.db.length === 0 ||
+      vault.db.length % 4 !== 0 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(vault.db)
+    ) {
+      throw new InvalidVaultError('Invalid vault: db is not valid base64');
+    }
+    try {
+      // confirm it actually decodes before attempting crypto
+      this.#base64ToBytes(vault.db);
+    }
+    catch {
+      throw new InvalidVaultError('Invalid vault: db is not valid base64');
+    }
   }
 
   #hexToBytes(hex) {
