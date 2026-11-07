@@ -1,6 +1,6 @@
 /* global otplib, tld, BarcodeDetector */
 
-import {AegisVault} from '../aegis/core.mjs';
+import {AegisVault, bytesToBase64} from '../aegis/core.mjs';
 import {prompt} from '../prompt.mjs';
 import Fuse from './fuse.min.mjs';
 
@@ -738,7 +738,7 @@ self.editor.querySelector('input[name=new-icon]').onchange = async e => {
     const blob = await new Response(file).blob();
     const buffer = await blob.arrayBuffer();
     const bytes = new Uint8Array(buffer);
-    const base64 = btoa(String.fromCharCode(...bytes));
+    const base64 = bytesToBase64(bytes);
 
     const hash = await iconHashFromEntry({
       'icon': base64,

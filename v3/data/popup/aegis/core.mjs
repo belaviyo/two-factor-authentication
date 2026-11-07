@@ -1,5 +1,17 @@
 /* global hashwasm */
 
+export function bytesToBase64(bytes) {
+  const chunkSize = 8192;
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    bin += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, i + chunkSize)
+    );
+  }
+  return btoa(bin);
+}
+
 export class AegisVault {
   constructor(vaultJson) {
     this.vault =
@@ -171,9 +183,7 @@ export class AegisVault {
             .join('')
         }
       },
-      db: btoa(
-        String.fromCharCode(...encryptedDb)
-      )
+      db: bytesToBase64(encryptedDb)
     };
 
     return new AegisVault(vault);
@@ -365,10 +375,6 @@ export class AegisVault {
   }
 
   #bytesToBase64(bytes) {
-    let bin = '';
-    for (let i = 0; i < bytes.length; i++) {
-      bin += String.fromCharCode(bytes[i]);
-    }
-    return btoa(bin);
+    return bytesToBase64(bytes);
   }
 }
