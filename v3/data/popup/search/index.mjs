@@ -264,6 +264,10 @@ onmessage = e => {
       const file = await handle.getFile();
       const json1 = await new Response(file).json();
 
+      e.target.value = 'Decrypt...';
+      const vault = new AegisVault(json1);
+      await vault.decrypt(password);
+
       // backup
       if (prefs['backup-before-save']) {
         const blob = new Blob([JSON.stringify(json1, null, '  ')], {type: 'application/json'});
@@ -276,11 +280,6 @@ onmessage = e => {
         URL.revokeObjectURL(a.href);
         a.remove();
       }
-
-      // is password valid?
-      e.target.value = 'Decrypt...';
-      const vault = new AegisVault(json1);
-      await vault.decrypt(password);
 
       // build groups
       database.groups = [];
