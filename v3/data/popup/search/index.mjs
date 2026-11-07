@@ -76,6 +76,11 @@ const start = async entries => {
   for (let n = 0; n < entries.length; n += 1) {
     const entry = entries[n];
 
+    // Aegis requires issuer to be a string; normalize legacy null values
+    if (entry.issuer == null) {
+      entry.issuer = '';
+    }
+
     const clone = document.importNode(self.entry.content, true);
     const name = clone.querySelector('[name=name]');
     name.title = name.textContent = entry.name;
@@ -88,7 +93,7 @@ const start = async entries => {
 
       if (icons.has(entry['icon_hash']) === false) {
         // fix old wrong generated hashes
-        if (entry['icon_hash'].length !== 64) {
+        if (!entry['icon_hash'] || entry['icon_hash'].length !== 64) {
           entry['icon_hash'] = await iconHashFromEntry(entry);
           console.info('wrong icon hash detected', entry['icon_hash']);
         }
@@ -643,8 +648,8 @@ self.edit.onclick = () => {
       }
       else {
         current.entry.icon = null;
-        delete current.entry['icon_hash'];
-        delete current.entry['icon_mime'];
+        current.entry['icon_hash'] = null;
+        current.entry['icon_mime'] = null;
         label.querySelector('img[name=icon]').src = '';
       }
       self.editor.querySelector('fieldset[name=icons]').textContent = ''; // cleaning
@@ -852,12 +857,14 @@ const addFromURI = uri => {
   const params = url.searchParams;
 
 
-  const issuer = params.get('issuer') || issuerFromLabel || null;
+  const issuer = params.get('issuer') || issuerFromLabel || "";
 
   const detail = {
     favorite: false,
     groups: [],
     icon: null,
+    icon_mime: null,
+    icon_hash: null,
     info: {
       secret: params.get('secret') || null,
       algo: (params.get('algorithm') || 'SHA1').toUpperCase(),

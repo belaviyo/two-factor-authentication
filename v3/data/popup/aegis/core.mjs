@@ -90,8 +90,7 @@ export class AegisVault {
     const emptyDb = {
       version: 1,
       entries: [],
-      groups: [],
-      icons_optimized: true
+      groups: []
     };
 
     const dbBytes = new TextEncoder().encode(
