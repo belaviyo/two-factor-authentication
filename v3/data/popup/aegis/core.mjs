@@ -251,6 +251,40 @@ export class AegisVault {
     return this.vault;
   }
 
+  async changePassword(oldPassword, newPassword) {
+    const slot = this.#getPasswordSlot();
+
+    const oldDerivedKey = await this.#deriveKey(
+      oldPassword,
+      this.#hexToBytes(slot.salt)
+    );
+
+    const masterKey = await this.#aesDecrypt({
+      key: oldDerivedKey,
+      nonce: this.#hexToBytes(slot.key_params.nonce),
+      tag: this.#hexToBytes(slot.key_params.tag),
+      data: this.#hexToBytes(slot.key)
+    });
+
+    const salt = crypto.getRandomValues(new Uint8Array(32));
+
+    const newDerivedKey = await this.#deriveKey(newPassword, salt);
+
+    const encrypted = await this.#aesEncrypt({
+      key: newDerivedKey,
+      data: masterKey
+    });
+
+    slot.salt = this.#bytesToHex(salt);
+    slot.key = this.#bytesToHex(encrypted.ciphertext);
+    slot.key_params = {
+      nonce: this.#bytesToHex(encrypted.nonce),
+      tag: this.#bytesToHex(encrypted.tag)
+    };
+
+    return this.vault;
+  }
+
   // =====================================================
   // PRIVATE METHODS
   // =====================================================

@@ -213,3 +213,27 @@ footer {
     width: 14ch;
   }
 }
+#passwordDialog {
+  width: 400px;
+  border: solid 1px var(--bd);
+  padding: 10px;
+
+  form {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    grid-gap: var(--gap);
+    align-items: center;
+
+    span {
+      white-space: nowrap;
+    }
+
+    & > div {
+      display: flex;
+      gap: var(--gap);
+      justify-content: end;
+      align-items: start;
+      width: 100%;
+    }
+  }
+}

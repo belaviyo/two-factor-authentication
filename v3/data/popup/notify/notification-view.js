@@ -130,14 +130,27 @@ class NotificationView extends HTMLElement {
       if (e.target.dataset.cmd === 'close') {
         e.target.closest('div').remove();
       }
+      else {
+        const div = e.target.closest('div');
+        if (div?.dataset.action) {
+          const action = div.dataset.action;
+          div.remove();
+          this.dispatchEvent(new CustomEvent('notify-action', {bubbles: true, detail: {action}}));
+        }
+      }
     });
   }
-  notify(content = 'Empty', type = 'info', timeout = 10000) {
+  notify(content = 'Empty', type = 'info', timeout = 10000, action) {
     const t = this.shadowRoot.querySelector('template');
     const clone = document.importNode(t.content, true);
     const div = clone.querySelector('div');
     div.classList.add(type);
     clone.querySelector('p').textContent = content;
+    if (action) {
+      div.dataset.action = action;
+      div.style.cursor = 'pointer';
+      div.title = 'Click to change password';
+    }
 
     this.shadowRoot.getElementById('body').append(clone);
     div.scrollIntoView();

@@ -25,6 +25,7 @@ const open = async (database, keypath) => {
     href: 'search/index.html',
     data: {
       password: self.password.value,
+      weakPassword: self.password.value.length < 8,
       keypath,
       database
     }
@@ -195,8 +196,8 @@ self.createDB.onclick = async e => {
     e.target.disabled = true;
     e.target.value = 'Select File...';
 
-    if (self.password.value.length < 4) {
-      throw Error('Password is too short!');
+    if (self.password.value.length < 8) {
+      throw Error('Password must be at least 8 characters!');
     }
 
     if (inPopup) {

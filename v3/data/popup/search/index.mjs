@@ -225,13 +225,30 @@ const start = async entries => {
 };
 
 onmessage = e => {
-  const {database, keypath, password, codes} = e.data;
+  if (e.data?.cmd === 'change-password') {
+    self.changePassword.click();
+    return;
+  }
+
+  const {database, keypath, codes} = e.data;
+  let {password, weakPassword} = e.data;
+
+  if (weakPassword) {
+    parent.command({
+      cmd: 'notify',
+      type: 'warning',
+      message: 'Weak password (<8 characters). Click here to change your password.',
+      timeout: 30000,
+      action: 'change-password'
+    });
+  }
 
   for (const group of database.groups) {
     groups.set(group.uuid, group.name);
   }
 
   sorting.perform(database.entries);
+  self.changePassword.disabled = false;
   // start(database.entries);
 
   self.save.onclick = async e => {
@@ -312,6 +329,116 @@ onmessage = e => {
     }
   };
 
+  self.changePassword.onclick = () => {
+    if (self.save.disabled === false) {
+      parent.command({
+        cmd: 'notify',
+        type: 'error',
+        message: 'Save Database before changing the password.'
+      });
+      return;
+    }
+    self.passwordDialog.querySelector('input[name=new]').value = '';
+    self.passwordDialog.querySelector('input[name=confirm]').value = '';
+    self.passwordDialog.showModal();
+    self.passwordDialog.querySelector('input[name=new]').focus();
+  };
+
+  self.passwordDialog.querySelector('input[name=close]').onclick = () => self.passwordDialog.close();
+
+  self.passwordDialog.querySelector('form').onsubmit = async e => {
+    e.preventDefault();
+    const submitter = e.submitter;
+
+    const newPassword = self.passwordDialog.querySelector('input[name=new]').value;
+    const confirmPassword = self.passwordDialog.querySelector('input[name=confirm]').value;
+
+    submitter.disabled = true;
+    submitter.value = 'Please wait...';
+
+    try {
+      if (newPassword.length < 8) {
+        throw Error('Password must be at least 8 characters!');
+      }
+      if (newPassword !== confirmPassword) {
+        throw Error('Passwords do not match');
+      }
+      if (newPassword === password) {
+        throw Error('New password must be different from the current password.');
+      }
+
+      const prefs = await chrome.storage.local.get({
+        'backup-before-save': true,
+        'password-on-session': true
+      });
+
+      self.changePassword.disabled = true;
+
+      const storage = new Storage('file');
+      await storage.open([{name: 'handles'}]);
+
+      const o = await storage.read('handles', keypath);
+      const handle = o.value;
+
+      const p = await handle.queryPermission({mode: 'readwrite'});
+      if (p !== 'granted') {
+        const p = await handle.requestPermission({mode: 'readwrite'});
+        if (p !== 'granted') {
+          throw Error('Permission is: ' + p);
+        }
+      }
+
+      const file = await handle.getFile();
+      const json1 = await new Response(file).json();
+
+      const vault = new AegisVault(json1);
+      await vault.decrypt(password);
+
+      // backup
+      if (prefs['backup-before-save']) {
+        const blob = new Blob([JSON.stringify(json1, null, '  ')], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = handle.name.replace('.json', '-' + Date.now() + '.json');
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }
+
+      const json2 = await vault.changePassword(password, newPassword);
+
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(json2, null, 2));
+      await writable.close();
+
+      password = newPassword;
+      weakPassword = false;
+
+      if (prefs['password-on-session']) {
+        chrome.storage.session.set({password: newPassword});
+      }
+
+      self.passwordDialog.close();
+      parent.command({
+        cmd: 'notify',
+        type: 'success',
+        message: 'Password changed. Use your new password next time.'
+      });
+    }
+    catch (err) {
+      console.error(err);
+      parent.command({
+        cmd: 'notify',
+        type: 'error',
+        message: err.message
+      });
+    }
+    submitter.disabled = false;
+    submitter.value = 'Apply';
+    self.changePassword.disabled = false;
+  };
+
   document.addEventListener('sort', () => sorting.perform(database.entries));
 
   document.addEventListener('entry', e => {
@@ -345,9 +472,9 @@ onkeydown = e => {
   const meta = e.ctrlKey || e.metaKey;
 
   const dlg = document.querySelector('dialog:open');
-  if (e.key === 'Escape' && dlg.open) {
+  if (e.key === 'Escape' && dlg) {
     e.preventDefault();
-    self.editor.close();
+    dlg.close();
     return;
   }
   if (e.key.toLowerCase() === 'f' && meta) {
@@ -369,6 +496,10 @@ onkeydown = e => {
   if (e.key.toLowerCase() === 's' && meta) {
     e.preventDefault();
     self.save.click();
+  }
+  if (e.key.toLowerCase() === 'p' && meta) {
+    e.preventDefault();
+    self.changePassword.click();
   }
 
   // If search input is focused

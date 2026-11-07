@@ -58,6 +58,7 @@ Ctrl + N or Command + N">
     <span id="code">Select an item to show OTP</span>
     <div>
       <button id="save" disabled accesskey="s"><u>S</u>ave Database</button>
+      <button id="changePassword" disabled accesskey="p">Change <u>P</u>assword</button>
       <button id="edit" disabled accesskey="e"><u>E</u>dit</button>
       <button id="delete" disabled accesskey="d"><u>D</u>elete</button>
       <button id="send" disabled accesskey="t">Send O<u>T</u>P</button>
@@ -99,6 +100,19 @@ Ctrl + N or Command + N">
       <div>
         <input type="button" name="close" value="Cancel">
         <input type="submit" value="Done">
+      </div>
+    </form>
+  </dialog>
+  <dialog id="passwordDialog" popover>
+    <form>
+      <span>New Password</span>
+      <input type="password" name="new" placeholder="min 8 chars" required autocomplete="new-password">
+      <span>Confirm Password</span>
+      <input type="password" name="confirm" required autocomplete="new-password">
+      <span></span>
+      <div>
+        <input type="button" name="close" value="Cancel">
+        <input type="submit" value="Apply">
       </div>
     </form>
   </dialog>

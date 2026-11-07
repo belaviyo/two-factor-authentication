@@ -30,9 +30,16 @@ self.command = request => {
     iframe.src = request.href;
   }
   else if (request.cmd === 'notify') {
-    self.toast.notify(request.message, request.type);
+    self.toast.notify(request.message, request.type, request.timeout, request.action);
   }
 };
+
+self.toast.addEventListener('notify-action', e => {
+  if (e.detail?.action === 'change-password') {
+    const iframe = document.getElementById('app-frame');
+    iframe.contentWindow.postMessage({cmd: 'change-password'}, '*');
+  }
+});
 
 // to receive commands from worker
 chrome.runtime.onMessage.addListener(request => {
