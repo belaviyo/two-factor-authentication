@@ -256,7 +256,6 @@ self.createDB.onclick = async e => {
     });
 
     const cp = await prompt('Re-enter the password', '', {password: true});
-    console.log(cp);
     if (cp !== self.password.value) {
       throw Error('Passwords do not match');
     }
